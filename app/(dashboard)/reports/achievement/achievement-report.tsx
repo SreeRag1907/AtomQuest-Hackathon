@@ -2,10 +2,17 @@
 
 import { useMemo, useState } from "react";
 import Papa from "papaparse";
-import { Download, Search } from "lucide-react";
+import * as XLSX from "xlsx";
+import { ChevronDown, Download, FileSpreadsheet, FileText, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -120,28 +127,35 @@ export function AchievementReport({
       });
   }, [goals, sheetById, empById, achievements, cycleId, department, thrustAreaId, search]);
 
+  function exportRows() {
+    return rows.map((r) => ({
+      Employee: r.emp?.full_name ?? "",
+      Department: r.emp?.department ?? "",
+      Goal: r.goal.title,
+      "Thrust area": r.goal.thrust_area_id
+        ? taById.get(r.goal.thrust_area_id)?.name ?? ""
+        : "",
+      UoM: UOM_LABELS[r.goal.uom_type as keyof typeof UOM_LABELS] ?? r.goal.uom_type,
+      Target:
+        r.goal.uom_type === "timeline"
+          ? r.goal.target_date ?? ""
+          : r.goal.target ?? "",
+      "Weightage %": r.goal.weightage,
+      "Q1 actual": r.actuals.q1?.actual_value ?? r.actuals.q1?.actual_date ?? "",
+      "Q1 score %": r.scores.q1 != null ? Number(r.scores.q1.toFixed(1)) : "",
+      "Q2 actual": r.actuals.q2?.actual_value ?? r.actuals.q2?.actual_date ?? "",
+      "Q2 score %": r.scores.q2 != null ? Number(r.scores.q2.toFixed(1)) : "",
+      "Q3 actual": r.actuals.q3?.actual_value ?? r.actuals.q3?.actual_date ?? "",
+      "Q3 score %": r.scores.q3 != null ? Number(r.scores.q3.toFixed(1)) : "",
+      "Q4 actual": r.actuals.q4?.actual_value ?? r.actuals.q4?.actual_date ?? "",
+      "Q4 score %": r.scores.q4 != null ? Number(r.scores.q4.toFixed(1)) : "",
+      "Annual score %":
+        r.annualScore != null ? Number(r.annualScore.toFixed(1)) : "",
+    }));
+  }
+
   function exportCsv() {
-    const csv = Papa.unparse(
-      rows.map((r) => ({
-        employee: r.emp?.full_name ?? "",
-        department: r.emp?.department ?? "",
-        goal: r.goal.title,
-        thrust_area: r.goal.thrust_area_id ? taById.get(r.goal.thrust_area_id)?.name ?? "" : "",
-        uom: r.goal.uom_type,
-        target:
-          r.goal.uom_type === "timeline" ? r.goal.target_date : r.goal.target ?? "",
-        weightage: r.goal.weightage,
-        q1_actual: r.actuals.q1?.actual_value ?? r.actuals.q1?.actual_date ?? "",
-        q1_score: r.scores.q1 != null ? r.scores.q1.toFixed(1) : "",
-        q2_actual: r.actuals.q2?.actual_value ?? r.actuals.q2?.actual_date ?? "",
-        q2_score: r.scores.q2 != null ? r.scores.q2.toFixed(1) : "",
-        q3_actual: r.actuals.q3?.actual_value ?? r.actuals.q3?.actual_date ?? "",
-        q3_score: r.scores.q3 != null ? r.scores.q3.toFixed(1) : "",
-        q4_actual: r.actuals.q4?.actual_value ?? r.actuals.q4?.actual_date ?? "",
-        q4_score: r.scores.q4 != null ? r.scores.q4.toFixed(1) : "",
-        annual_score: r.annualScore != null ? r.annualScore.toFixed(1) : "",
-      }))
-    );
+    const csv = Papa.unparse(exportRows());
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -149,6 +163,27 @@ export function AchievementReport({
     a.download = `achievement-report-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function exportXlsx() {
+    const data = exportRows();
+    const ws = XLSX.utils.json_to_sheet(data);
+    // Auto-fit columns roughly based on content length
+    const colWidths = Object.keys(data[0] ?? {}).map((key) => {
+      const headerLen = key.length;
+      const maxCellLen = data.reduce((max, row) => {
+        const v = (row as Record<string, unknown>)[key];
+        return Math.max(max, String(v ?? "").length);
+      }, 0);
+      return { wch: Math.min(Math.max(headerLen, maxCellLen) + 2, 40) };
+    });
+    ws["!cols"] = colWidths;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Achievement");
+    XLSX.writeFile(
+      wb,
+      `achievement-report-${new Date().toISOString().slice(0, 10)}.xlsx`
+    );
   }
 
   return (
@@ -204,9 +239,25 @@ export function AchievementReport({
         <div className="ml-auto text-xs text-muted-foreground">
           {rows.length} row{rows.length === 1 ? "" : "s"}
         </div>
-        <Button variant="outline" size="sm" onClick={exportCsv}>
-          <Download className="h-3.5 w-3.5" /> Export CSV
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Download className="h-3.5 w-3.5" />
+              Export
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={exportCsv}>
+              <FileText className="mr-2 h-4 w-4" />
+              CSV (.csv)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={exportXlsx}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Excel (.xlsx)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <div className="overflow-x-auto">
         <Table>

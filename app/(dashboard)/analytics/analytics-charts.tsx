@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import {
   Bar,
   BarChart,
@@ -39,7 +40,7 @@ const CHART_COLORS = [
   "hsl(120, 60%, 45%)",
 ];
 
-function KpiCard({
+export function KpiCard({
   label,
   value,
   accent,
@@ -62,8 +63,6 @@ function KpiCard({
     </Card>
   );
 }
-
-export const OrgKpis = { Card: KpiCard };
 
 export function QoqTrend({
   data,
@@ -89,7 +88,7 @@ export function QoqTrend({
   );
 }
 
-function Donut({ data }: { data: Array<{ name: string; value: number }> }) {
+export function Donut({ data }: { data: Array<{ name: string; value: number }> }) {
   return (
     <ResponsiveContainer width="100%" height={240}>
       <PieChart>
@@ -105,7 +104,7 @@ function Donut({ data }: { data: Array<{ name: string; value: number }> }) {
   );
 }
 
-function UomBars({ data }: { data: Array<{ name: string; value: number }> }) {
+export function UomBars({ data }: { data: Array<{ name: string; value: number }> }) {
   return (
     <ResponsiveContainer width="100%" height={240}>
       <BarChart data={data} layout="vertical" margin={{ left: 80 }}>
@@ -119,7 +118,7 @@ function UomBars({ data }: { data: Array<{ name: string; value: number }> }) {
   );
 }
 
-function StackedStatus({
+export function StackedStatus({
   data,
 }: {
   data: Array<{
@@ -149,8 +148,6 @@ function StackedStatus({
   );
 }
 
-export const DistributionCharts = { Donut, UomBars, StackedStatus };
-
 interface HeatmapProps {
   data: Array<{
     department: string;
@@ -177,10 +174,8 @@ export function Heatmap({ data }: HeatmapProps) {
           </div>
         ))}
         {data.map((row) => (
-          <>
-            <div key={row.department} className="pr-3 text-sm">
-              {row.department}
-            </div>
+          <React.Fragment key={row.department}>
+            <div className="pr-3 text-sm">{row.department}</div>
             {row.cells.map((cell) => (
               <div
                 key={`${row.department}-${cell.quarter}`}
@@ -193,7 +188,7 @@ export function Heatmap({ data }: HeatmapProps) {
                 {cell.score == null ? "—" : `${Math.round(cell.score)}%`}
               </div>
             ))}
-          </>
+          </React.Fragment>
         ))}
       </div>
     </div>

@@ -16,7 +16,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials } from "@/lib/utils";
 import type { GoalSheet, Profile } from "@/types/database";
 
-function SubmissionFunnel({
+export function SubmissionFunnel({
   data,
   totalEmployees,
 }: {
@@ -41,7 +41,7 @@ function SubmissionFunnel({
   );
 }
 
-function QuarterlyBars({
+export function QuarterlyBars({
   data,
 }: {
   data: Array<{ quarter: string; done: number; pending: number }>;
@@ -63,7 +63,7 @@ function QuarterlyBars({
   );
 }
 
-function PendingList({
+export function PendingList({
   profiles,
   sheets,
 }: {
@@ -100,9 +100,3 @@ function PendingList({
     </div>
   );
 }
-
-export const CompletionCharts = {
-  SubmissionFunnel,
-  QuarterlyBars,
-  PendingList,
-};

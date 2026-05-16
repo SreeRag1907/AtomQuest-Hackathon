@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CompletionCharts } from "./completion-charts";
+import { SubmissionFunnel, QuarterlyBars, PendingList } from "./completion-charts";
 import type {
   Achievement,
   Cycle,
@@ -100,7 +100,7 @@ export default async function CompletionReportPage() {
             <CardTitle className="text-base">Goal sheet submissions</CardTitle>
           </CardHeader>
           <CardContent>
-            <CompletionCharts.SubmissionFunnel data={submissionStages} totalEmployees={totalEmployees} />
+            <SubmissionFunnel data={submissionStages} totalEmployees={totalEmployees} />
           </CardContent>
         </Card>
         <Card>
@@ -108,7 +108,7 @@ export default async function CompletionReportPage() {
             <CardTitle className="text-base">Quarterly check-in completion</CardTitle>
           </CardHeader>
           <CardContent>
-            <CompletionCharts.QuarterlyBars data={quarterStats} />
+            <QuarterlyBars data={quarterStats} />
           </CardContent>
         </Card>
       </div>
@@ -118,7 +118,7 @@ export default async function CompletionReportPage() {
           <CardTitle className="text-base">Employees who haven't submitted</CardTitle>
         </CardHeader>
         <CardContent>
-          <CompletionCharts.PendingList
+          <PendingList
             profiles={(profiles ?? []) as Profile[]}
             sheets={(sheets ?? []) as GoalSheet[]}
           />

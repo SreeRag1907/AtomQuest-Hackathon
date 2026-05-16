@@ -3,7 +3,15 @@ import { requireProfile } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { computeScore } from "@/lib/scoring";
-import { OrgKpis, QoqTrend, DistributionCharts, Heatmap, ManagerEffectiveness } from "./analytics-charts";
+import {
+  KpiCard,
+  QoqTrend,
+  Donut,
+  UomBars,
+  StackedStatus,
+  Heatmap,
+  ManagerEffectiveness,
+} from "./analytics-charts";
 import { EmployeeDrilldown } from "./employee-drilldown";
 import { UOM_LABELS } from "@/lib/validations/goal";
 import type {
@@ -219,10 +227,10 @@ export default async function AnalyticsPage() {
           Organization overview
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <OrgKpis.Card label="Avg achievement score" value={`${Math.round(avgScore)}%`} accent="primary" />
-          <OrgKpis.Card label="On-track / completed" value={`${onTrackPct}%`} accent="success" />
-          <OrgKpis.Card label="At-risk goals" value={atRiskCount} accent="warning" />
-          <OrgKpis.Card label="Total goals" value={(goals ?? []).length} accent="primary" />
+          <KpiCard label="Avg achievement score" value={`${Math.round(avgScore)}%`} accent="primary" />
+          <KpiCard label="On-track / completed" value={`${onTrackPct}%`} accent="success" />
+          <KpiCard label="At-risk goals" value={atRiskCount} accent="warning" />
+          <KpiCard label="Total goals" value={(goals ?? []).length} accent="primary" />
         </div>
         <Card>
           <CardHeader>
@@ -245,7 +253,7 @@ export default async function AnalyticsPage() {
               <CardTitle className="text-base">By thrust area</CardTitle>
             </CardHeader>
             <CardContent>
-              <DistributionCharts.Donut data={thrustDist} />
+              <Donut data={thrustDist} />
             </CardContent>
           </Card>
           <Card>
@@ -253,7 +261,7 @@ export default async function AnalyticsPage() {
               <CardTitle className="text-base">By UoM type</CardTitle>
             </CardHeader>
             <CardContent>
-              <DistributionCharts.UomBars data={uomDist} />
+              <UomBars data={uomDist} />
             </CardContent>
           </Card>
           <Card>
@@ -261,7 +269,7 @@ export default async function AnalyticsPage() {
               <CardTitle className="text-base">Status by department</CardTitle>
             </CardHeader>
             <CardContent>
-              <DistributionCharts.StackedStatus data={statusByDept} />
+              <StackedStatus data={statusByDept} />
             </CardContent>
           </Card>
         </div>

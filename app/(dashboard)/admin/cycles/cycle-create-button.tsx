@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { CalendarRange, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,35 @@ export function CycleCreateButton() {
     setForm((p) => ({ ...p, [k]: v }));
   }
 
+  /**
+   * Fills the form with the canonical BRD calendar:
+   *   Goal setting:   May 1 → June 30  (year Y)
+   *   Q1 check-in:    July 1 → July 31
+   *   Q2 check-in:    Oct 1 → Oct 31
+   *   Q3 check-in:    Jan 1 → Jan 31   (year Y+1)
+   *   Q4 / annual:    Mar 1 → Apr 30   (year Y+1)
+   */
+  function applyBrdCalendar(startYear: number) {
+    const Y = startYear;
+    const N = startYear + 1;
+    const iso = (y: number, m: number, d: number) =>
+      `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    setForm({
+      name: form.name || `FY${String(Y).slice(2)}-${String(N).slice(2)}`,
+      goal_setting_opens: iso(Y, 5, 1),
+      goal_setting_closes: iso(Y, 6, 30),
+      q1_opens: iso(Y, 7, 1),
+      q1_closes: iso(Y, 7, 31),
+      q2_opens: iso(Y, 10, 1),
+      q2_closes: iso(Y, 10, 31),
+      q3_opens: iso(N, 1, 1),
+      q3_closes: iso(N, 1, 31),
+      q4_opens: iso(N, 3, 1),
+      q4_closes: iso(N, 4, 30),
+    });
+  }
+
+
   function submit() {
     startTransition(async () => {
       const r = await createCycle({
@@ -76,7 +105,8 @@ export function CycleCreateButton() {
         <DialogHeader>
           <DialogTitle>Create a new cycle</DialogTitle>
           <DialogDescription>
-            You can leave dates empty for a quick demo cycle and advance phases manually.
+            You can leave dates empty for a quick demo cycle and advance phases
+            manually, or fill them with the standard fiscal calendar below.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -87,6 +117,32 @@ export function CycleCreateButton() {
               onChange={(e) => update("name", e.target.value)}
               placeholder="FY2027"
             />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-2 text-xs">
+            <CalendarRange className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground">
+              Use BRD calendar (May / Jul / Oct / Jan / Mar–Apr):
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => applyBrdCalendar(new Date().getFullYear())}
+            >
+              FY {String(new Date().getFullYear()).slice(2)}-
+              {String(new Date().getFullYear() + 1).slice(2)}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => applyBrdCalendar(new Date().getFullYear() + 1)}
+            >
+              FY {String(new Date().getFullYear() + 1).slice(2)}-
+              {String(new Date().getFullYear() + 2).slice(2)}
+            </Button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Pair label="Goal setting opens" value={form.goal_setting_opens} onChange={(v) => update("goal_setting_opens", v)} />

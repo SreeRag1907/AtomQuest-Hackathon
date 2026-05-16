@@ -162,6 +162,111 @@ export async function returnGoalSheet(sheetId: string, reason: string): Promise<
   return { ok: true };
 }
 
+/**
+ * Manager-side inline edit of submitted goals during approval review.
+ * Allows tweaking weightage, target/target_date, title or thrust area before
+ * approving so the back-and-forth of "return → fix → resubmit" can be skipped
+ * for minor adjustments. Audit trigger captures every change.
+ *
+ * Restrictions:
+ * - Sheet must be in `submitted` status (under review)
+ * - Sum of weightages must remain 100%
+ * - Cannot edit child (shared) goals — those mirror their parent
+ */
+export async function managerUpdateGoals(
+  sheetId: string,
+  edits: Array<{
+    id: string;
+    title?: string;
+    description?: string | null;
+    target?: number | null;
+    target_date?: string | null;
+    weightage?: number;
+    thrust_area_id?: string | null;
+  }>
+): Promise<Result> {
+  const auth = await authManager();
+  if ("error" in auth) return { ok: false, error: auth.error };
+  const supabase = await createClient();
+
+  const { data: sheet } = await supabase
+    .from("goal_sheets")
+    .select("*")
+    .eq("id", sheetId)
+    .single<GoalSheet>();
+  if (!sheet) return { ok: false, error: "Sheet not found" };
+  if (
+    auth.me.role !== "admin" &&
+    !(await ensureTeamMember(auth.me.id, sheet.employee_id))
+  ) {
+    return { ok: false, error: "Not authorized" };
+  }
+  if (sheet.status !== "submitted") {
+    return { ok: false, error: "Inline edits are only allowed during review (submitted state)" };
+  }
+
+  const { data: existing } = await supabase
+    .from("goals")
+    .select("id, weightage, parent_goal_id")
+    .eq("goal_sheet_id", sheetId);
+  const byId = new Map((existing ?? []).map((g) => [g.id, g]));
+
+  // Validate ownership and child-lock
+  for (const e of edits) {
+    const g = byId.get(e.id);
+    if (!g) return { ok: false, error: `Goal ${e.id} not on this sheet` };
+    if (g.parent_goal_id) {
+      return {
+        ok: false,
+        error:
+          "One or more goals are linked shared goals (auto-synced). Edit the primary goal instead.",
+      };
+    }
+  }
+
+  // Compute resulting weightage total
+  let total = 0;
+  for (const g of existing ?? []) {
+    const e = edits.find((x) => x.id === g.id);
+    total += e?.weightage ?? g.weightage;
+  }
+  if (total !== 100) {
+    return {
+      ok: false,
+      error: `Weightages must sum to 100% (currently ${total}%)`,
+    };
+  }
+
+  for (const e of edits) {
+    const patch: Record<string, unknown> = {};
+    if (e.title !== undefined) patch.title = e.title.trim();
+    if (e.description !== undefined) patch.description = e.description;
+    if (e.target !== undefined) patch.target = e.target;
+    if (e.target_date !== undefined) patch.target_date = e.target_date;
+    if (e.weightage !== undefined) patch.weightage = e.weightage;
+    if (e.thrust_area_id !== undefined) patch.thrust_area_id = e.thrust_area_id;
+    if (Object.keys(patch).length === 0) continue;
+    const { error } = await supabase
+      .from("goals")
+      .update(patch)
+      .eq("id", e.id)
+      .eq("goal_sheet_id", sheetId);
+    if (error) return { ok: false, error: error.message };
+  }
+
+  await supabase.from("notifications").insert({
+    user_id: sheet.employee_id,
+    type: "manager_edited",
+    title: "Manager adjusted your goals during review",
+    message: "See the audit history for details.",
+    link: `/goals/${sheetId}`,
+  });
+
+  revalidatePath(`/team/${sheet.employee_id}`);
+  revalidatePath(`/goals/${sheetId}`);
+  return { ok: true };
+}
+
 export async function saveCheckinComment(
   sheetId: string,
   quarter: string,

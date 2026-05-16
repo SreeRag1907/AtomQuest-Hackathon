@@ -14,6 +14,7 @@ import { initials } from "@/lib/utils";
 import { ApprovalActions } from "./approval-actions";
 import { CheckinReview } from "./checkin-review";
 import { GoalsReadOnly } from "./goals-read-only";
+import { GoalsManagerEdit } from "./goals-manager-edit";
 import type {
   Achievement,
   CheckinComment,
@@ -139,10 +140,18 @@ export default async function TeamMemberPage({
             {sheet.status === "submitted" && (
               <ApprovalActions sheetId={sheet.id} employeeName={employee.full_name} />
             )}
-            <GoalsReadOnly
-              goals={(goals ?? []) as Goal[]}
-              thrustAreas={(thrustAreas ?? []) as ThrustArea[]}
-            />
+            {sheet.status === "submitted" ? (
+              <GoalsManagerEdit
+                sheetId={sheet.id}
+                goals={(goals ?? []) as Goal[]}
+                thrustAreas={(thrustAreas ?? []) as ThrustArea[]}
+              />
+            ) : (
+              <GoalsReadOnly
+                goals={(goals ?? []) as Goal[]}
+                thrustAreas={(thrustAreas ?? []) as ThrustArea[]}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="checkins">

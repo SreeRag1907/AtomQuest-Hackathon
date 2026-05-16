@@ -54,6 +54,74 @@ export default async function GoalSheetDetailPage({
   const isOwner = sheet.employee_id === profile.id;
   const isEditable = isOwner && ["draft", "returned"].includes(sheet.status);
 
+  // --- Shared-goal context ---
+  // Existing recipients per parent goal owned by this sheet
+  const goalIds = (goals ?? []).map((g) => g.id);
+  const recipientsByGoalId: Record<string, string[]> = {};
+  if (goalIds.length > 0) {
+    const { data: recRows } = await supabase
+      .from("shared_goal_recipients")
+      .select("parent_goal_id, recipient_id")
+      .in("parent_goal_id", goalIds);
+    for (const r of recRows ?? []) {
+      const pid = (r as { parent_goal_id: string }).parent_goal_id;
+      const rid = (r as { recipient_id: string }).recipient_id;
+      (recipientsByGoalId[pid] ??= []).push(rid);
+    }
+  }
+
+  // For child goals: build childGoalId -> parentOwnerName map
+  const childParentIds = (goals ?? [])
+    .map((g) => g.parent_goal_id)
+    .filter((x): x is string => !!x);
+  const parentOwnerByGoalId: Record<string, string> = {};
+  if (childParentIds.length > 0) {
+    const { data: parentRows } = await supabase
+      .from("goals")
+      .select("id, goal_sheets(employee_id, profiles:employee_id(full_name))")
+      .in("id", childParentIds);
+    type ParentRow = {
+      id: string;
+      goal_sheets:
+        | { employee_id: string; profiles: { full_name: string } | null }
+        | null;
+    };
+    const ownerByParent = new Map<string, string>();
+    for (const row of (parentRows ?? []) as unknown as ParentRow[]) {
+      const name = row.goal_sheets?.profiles?.full_name;
+      if (name) ownerByParent.set(row.id, name);
+    }
+    for (const g of goals ?? []) {
+      if (g.parent_goal_id) {
+        const owner = ownerByParent.get(g.parent_goal_id);
+        if (owner) parentOwnerByGoalId[g.id] = owner;
+      }
+    }
+  }
+
+  // Share candidates: managers see direct reports; admins see all employees
+  let shareCandidates: Profile[] = [];
+  const canShare = profile.role !== "employee";
+  if (canShare) {
+    if (profile.role === "admin") {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .neq("id", profile.id)
+        .eq("is_active", true)
+        .order("full_name");
+      shareCandidates = (data ?? []) as Profile[];
+    } else if (profile.role === "manager") {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("manager_id", profile.id)
+        .eq("is_active", true)
+        .order("full_name");
+      shareCandidates = (data ?? []) as Profile[];
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -119,6 +187,15 @@ export default async function GoalSheetDetailPage({
           thrustAreas={(thrustAreas ?? []) as ThrustArea[]}
           isReturned={sheet.status === "returned"}
           returnReason={sheet.return_reason}
+          canShare={canShare && isOwner}
+          shareCandidates={shareCandidates.map((p) => ({
+            id: p.id,
+            full_name: p.full_name,
+            email: p.email,
+            department: p.department,
+          }))}
+          recipientsByGoalId={recipientsByGoalId}
+          parentOwnerByGoalId={parentOwnerByGoalId}
         />
       ) : (
         <div className="space-y-3">

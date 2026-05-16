@@ -23,6 +23,7 @@ import { useGoalSheetValidation } from "@/hooks/use-goal-sheet-validation";
 import type { Goal, ThrustArea, UomType } from "@/types/database";
 import { GoalCard } from "./goal-card";
 import { WeightageBar } from "./weightage-bar";
+import type { ShareRecipient } from "./share-goal-dialog";
 
 export interface GoalRow {
   _key: string;
@@ -34,6 +35,8 @@ export interface GoalRow {
   target: number | null;
   target_date: string | null;
   weightage: number | null;
+  parent_goal_id?: string | null;
+  parent_owner_name?: string | null;
 }
 
 interface Props {
@@ -42,6 +45,10 @@ interface Props {
   thrustAreas: ThrustArea[];
   isReturned?: boolean;
   returnReason?: string | null;
+  canShare?: boolean;
+  shareCandidates?: ShareRecipient[];
+  recipientsByGoalId?: Record<string, string[]>;
+  parentOwnerByGoalId?: Record<string, string>;
 }
 
 const MAX_GOALS = 8;
@@ -59,7 +66,7 @@ function newRow(): GoalRow {
   };
 }
 
-function rowFromGoal(g: Goal): GoalRow {
+function rowFromGoal(g: Goal, parentOwnerByGoalId?: Record<string, string>): GoalRow {
   return {
     _key: g.id,
     id: g.id,
@@ -70,6 +77,10 @@ function rowFromGoal(g: Goal): GoalRow {
     target: g.target,
     target_date: g.target_date,
     weightage: g.weightage,
+    parent_goal_id: g.parent_goal_id,
+    parent_owner_name: g.parent_goal_id
+      ? (parentOwnerByGoalId?.[g.id] ?? null)
+      : null,
   };
 }
 
@@ -79,10 +90,16 @@ export function GoalSheetForm({
   thrustAreas,
   isReturned,
   returnReason,
+  canShare,
+  shareCandidates,
+  recipientsByGoalId,
+  parentOwnerByGoalId,
 }: Props) {
   const router = useRouter();
   const [goals, setGoals] = useState<GoalRow[]>(() =>
-    initialGoals.length > 0 ? initialGoals.map(rowFromGoal) : [newRow()]
+    initialGoals.length > 0
+      ? initialGoals.map((g) => rowFromGoal(g, parentOwnerByGoalId))
+      : [newRow()]
   );
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [submitOpen, setSubmitOpen] = useState(false);
@@ -109,6 +126,7 @@ export function GoalSheetForm({
 
   function payload() {
     return goals.map((g) => ({
+      id: g.id ?? null,
       thrust_area_id: g.thrust_area_id,
       title: g.title,
       description: g.description,
@@ -182,6 +200,13 @@ export function GoalSheetForm({
             }
             onChange={(patchValues) => patch(idx, patchValues)}
             onDelete={() => deleteAt(idx)}
+            canShare={canShare && !g.parent_goal_id}
+            shareCandidates={shareCandidates}
+            existingRecipientIds={
+              g.id ? (recipientsByGoalId?.[g.id] ?? []) : []
+            }
+            isChild={!!g.parent_goal_id}
+            parentOwnerName={g.parent_owner_name ?? null}
           />
         ))}
       </div>

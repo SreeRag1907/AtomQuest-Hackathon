@@ -7,6 +7,7 @@ import { sendEmail } from "@/lib/email";
 import { goalSubmittedEmail } from "@/lib/email/templates";
 
 export interface GoalDraftInput {
+  id?: string | null;
   thrust_area_id: string | null;
   title: string;
   description?: string | null;
@@ -199,28 +200,77 @@ async function replaceGoals(
 ): Promise<ActionResult> {
   const supabase = await createClient();
 
-  // Naive but reliable: delete all goals and re-insert. Volume is small
-  // (max 8 per sheet) and audit triggers will record both.
-  const { error: delErr } = await supabase.from("goals").delete().eq("goal_sheet_id", sheetId);
-  if (delErr) return { ok: false, error: delErr.message };
+  // We do an upsert-by-id pattern instead of delete+insert. This preserves
+  // primary keys, so any child goals on OTHER sheets that reference these
+  // rows via parent_goal_id stay correctly linked. We then delete only the
+  // rows the user removed in this session.
+  const { data: existing } = await supabase
+    .from("goals")
+    .select("id")
+    .eq("goal_sheet_id", sheetId);
 
-  if (goals.length === 0) return { ok: true };
+  const existingIds = new Set((existing ?? []).map((r) => r.id as string));
+  const incomingIds = new Set(
+    goals.map((g) => g.id).filter((x): x is string => !!x)
+  );
+  const toDelete = [...existingIds].filter((id) => !incomingIds.has(id));
 
-  const rows = goals.map((g, idx) => ({
-    goal_sheet_id: sheetId,
-    thrust_area_id: g.thrust_area_id,
-    title: g.title.trim(),
-    description: g.description ?? null,
-    uom_type: g.uom_type,
-    target:
-      g.uom_type === "timeline" ? null : g.uom_type === "zero" ? 0 : g.target,
-    target_date: g.uom_type === "timeline" ? g.target_date : null,
-    weightage: g.weightage ?? 0,
-    display_order: idx,
-  }));
+  if (toDelete.length > 0) {
+    const { error: delErr } = await supabase
+      .from("goals")
+      .delete()
+      .in("id", toDelete);
+    if (delErr) return { ok: false, error: delErr.message };
+  }
 
-  const { error: insErr } = await supabase.from("goals").insert(rows);
-  if (insErr) return { ok: false, error: insErr.message };
+  if (goals.length === 0) {
+    revalidatePath("/goals");
+    revalidatePath(`/goals/${sheetId}`);
+    return { ok: true };
+  }
+
+  const updates = goals
+    .map((g, idx) => ({ g, idx }))
+    .filter(({ g }) => g.id);
+  const inserts = goals
+    .map((g, idx) => ({ g, idx }))
+    .filter(({ g }) => !g.id);
+
+  for (const { g, idx } of updates) {
+    const { error } = await supabase
+      .from("goals")
+      .update({
+        thrust_area_id: g.thrust_area_id,
+        title: g.title.trim(),
+        description: g.description ?? null,
+        uom_type: g.uom_type,
+        target:
+          g.uom_type === "timeline" ? null : g.uom_type === "zero" ? 0 : g.target,
+        target_date: g.uom_type === "timeline" ? g.target_date : null,
+        weightage: g.weightage ?? 0,
+        display_order: idx,
+      })
+      .eq("id", g.id!)
+      .eq("goal_sheet_id", sheetId);
+    if (error) return { ok: false, error: error.message };
+  }
+
+  if (inserts.length > 0) {
+    const rows = inserts.map(({ g, idx }) => ({
+      goal_sheet_id: sheetId,
+      thrust_area_id: g.thrust_area_id,
+      title: g.title.trim(),
+      description: g.description ?? null,
+      uom_type: g.uom_type,
+      target:
+        g.uom_type === "timeline" ? null : g.uom_type === "zero" ? 0 : g.target,
+      target_date: g.uom_type === "timeline" ? g.target_date : null,
+      weightage: g.weightage ?? 0,
+      display_order: idx,
+    }));
+    const { error: insErr } = await supabase.from("goals").insert(rows);
+    if (insErr) return { ok: false, error: insErr.message };
+  }
 
   revalidatePath("/goals");
   revalidatePath(`/goals/${sheetId}`);

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Link2, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,14 +12,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { UOM_LABELS, UOM_TYPES } from "@/lib/validations/goal";
 import type { ThrustArea, UomType } from "@/types/database";
 import type { ValidationError, GoalField } from "@/hooks/use-goal-sheet-validation";
 import type { GoalRow } from "./goal-sheet-form";
+import {
+  ShareGoalDialog,
+  type ShareRecipient,
+} from "./share-goal-dialog";
 
-interface Props {
+interface SharingProps {
+  canShare?: boolean;
+  shareCandidates?: ShareRecipient[];
+  existingRecipientIds?: string[];
+  shareDisabledReason?: string;
+}
+
+interface ChildProps {
+  isChild?: boolean;
+  parentOwnerName?: string | null;
+}
+
+interface Props extends SharingProps, ChildProps {
   index: number;
   goal: GoalRow;
   thrustAreas: ThrustArea[];
@@ -41,6 +58,12 @@ export function GoalCard({
   onChange,
   onDelete,
   readOnly,
+  canShare,
+  shareCandidates,
+  existingRecipientIds,
+  shareDisabledReason,
+  isChild,
+  parentOwnerName,
 }: Props) {
   const fieldError = (field: GoalField) =>
     errors.find((e) => e.goalIndex === index && e.field === field)?.message;
@@ -49,26 +72,73 @@ export function GoalCard({
   const showTargetDate = goal.uom_type === "timeline";
   const showTarget = goal.uom_type !== "timeline" && goal.uom_type !== "zero";
 
+  // For child rows of a shared goal, only weightage and display order are
+  // editable. Title/UoM/target/description/thrust come from the parent.
+  const lockedFromParent = isChild === true;
+  const fieldDisabled = readOnly || lockedFromParent;
+  const recipientCount = existingRecipientIds?.length ?? 0;
+  const isParentShared = (recipientCount ?? 0) > 0;
+  const showShareButton =
+    canShare === true && shareCandidates !== undefined && !lockedFromParent;
+  const shareReason =
+    shareDisabledReason ??
+    (!goal.id ? "Save the sheet first to share this goal" : undefined);
+
   return (
-    <Card className={cn("transition-shadow", errors.some((e) => e.goalIndex === index) && "border-destructive/40")}>
+    <Card
+      className={cn(
+        "transition-shadow",
+        errors.some((e) => e.goalIndex === index) && "border-destructive/40",
+        lockedFromParent && "bg-muted/20",
+        isParentShared && "border-primary/30"
+      )}
+    >
       <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-3">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <div
             className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium",
+              "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium",
               errors.some((e) => e.goalIndex === index)
                 ? "bg-destructive/10 text-destructive"
-                : "bg-primary/10 text-primary"
+                : isParentShared
+                  ? "bg-primary/15 text-primary"
+                  : "bg-primary/10 text-primary"
             )}
           >
             {index + 1}
           </div>
-          <div className="text-sm font-medium">
-            {goal.title || `Goal ${index + 1}`}
+          <div className="min-w-0">
+            <div className="truncate text-sm font-medium">
+              {goal.title || `Goal ${index + 1}`}
+            </div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+              {lockedFromParent && (
+                <Badge variant="muted" className="gap-1">
+                  <Link2 className="h-3 w-3" />
+                  Shared from {parentOwnerName ?? "your manager"}
+                </Badge>
+              )}
+              {isParentShared && (
+                <Badge variant="success" className="gap-1">
+                  <Users className="h-3 w-3" />
+                  Shared with {recipientCount}
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {!readOnly && (
+          {showShareButton && (
+            <ShareGoalDialog
+              goalId={goal.id ?? ""}
+              goalTitle={goal.title || `Goal ${index + 1}`}
+              candidates={shareCandidates ?? []}
+              existingRecipientIds={existingRecipientIds ?? []}
+              disabled={!goal.id}
+              disabledReason={shareReason}
+            />
+          )}
+          {!readOnly && !lockedFromParent && (
             <Button
               type="button"
               variant="ghost"
@@ -93,13 +163,20 @@ export function GoalCard({
       </CardHeader>
       {!isCollapsed && (
         <CardContent className="space-y-4 pt-0">
+          {lockedFromParent && (
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-2 text-xs text-muted-foreground">
+              This is a shared goal. Title, target and UoM are owned by the
+              primary owner. You can adjust your weightage to reflect your share
+              of the work.
+            </div>
+          )}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Thrust area</Label>
               <Select
                 value={goal.thrust_area_id ?? ""}
                 onValueChange={(v) => onChange({ thrust_area_id: v })}
-                disabled={readOnly}
+                disabled={fieldDisabled}
               >
                 <SelectTrigger className={cn(fieldError("thrust_area_id") && "border-destructive")}>
                   <SelectValue placeholder="Select thrust area" />
@@ -120,7 +197,7 @@ export function GoalCard({
               <Select
                 value={goal.uom_type}
                 onValueChange={(v) => onChange({ uom_type: v as UomType, target: null, target_date: null })}
-                disabled={readOnly}
+                disabled={fieldDisabled}
               >
                 <SelectTrigger className={cn(fieldError("uom_type") && "border-destructive")}>
                   <SelectValue placeholder="Select UoM" />
@@ -144,7 +221,7 @@ export function GoalCard({
               onChange={(e) => onChange({ title: e.target.value })}
               placeholder="What do you want to achieve?"
               className={cn(fieldError("title") && "border-destructive")}
-              disabled={readOnly}
+              disabled={fieldDisabled}
             />
             <ErrorText msg={fieldError("title")} />
           </div>
@@ -156,7 +233,7 @@ export function GoalCard({
               onChange={(e) => onChange({ description: e.target.value })}
               placeholder="Optional context, success criteria, links..."
               rows={3}
-              disabled={readOnly}
+              disabled={fieldDisabled}
             />
           </div>
 
@@ -175,7 +252,7 @@ export function GoalCard({
                   value={goal.target_date ?? ""}
                   onChange={(e) => onChange({ target_date: e.target.value })}
                   className={cn(fieldError("target_date") && "border-destructive")}
-                  disabled={readOnly}
+                  disabled={fieldDisabled}
                 />
               ) : showTarget ? (
                 <Input
@@ -189,7 +266,7 @@ export function GoalCard({
                   }
                   placeholder={isPercent ? "0–100" : "Value"}
                   className={cn(fieldError("target") && "border-destructive")}
-                  disabled={readOnly}
+                  disabled={fieldDisabled}
                 />
               ) : (
                 <Input value="0 (zero)" disabled />

@@ -107,6 +107,35 @@ export default async function CheckinsPage() {
     .from("thrust_areas")
     .select("*");
 
+  // Resolve parent-owner names for any child goals on this sheet
+  const childParentIds = (goals ?? [])
+    .map((g) => g.parent_goal_id)
+    .filter((x): x is string => !!x);
+  const parentOwnerByGoalId: Record<string, string> = {};
+  if (childParentIds.length > 0) {
+    const { data: parentRows } = await supabase
+      .from("goals")
+      .select("id, goal_sheets(employee_id, profiles:employee_id(full_name))")
+      .in("id", childParentIds);
+    type ParentRow = {
+      id: string;
+      goal_sheets:
+        | { employee_id: string; profiles: { full_name: string } | null }
+        | null;
+    };
+    const ownerByParent = new Map<string, string>();
+    for (const row of (parentRows ?? []) as unknown as ParentRow[]) {
+      const name = row.goal_sheets?.profiles?.full_name;
+      if (name) ownerByParent.set(row.id, name);
+    }
+    for (const g of goals ?? []) {
+      if (g.parent_goal_id) {
+        const owner = ownerByParent.get(g.parent_goal_id);
+        if (owner) parentOwnerByGoalId[g.id] = owner;
+      }
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -122,6 +151,7 @@ export default async function CheckinsPage() {
         goals={(goals ?? []) as Goal[]}
         achievements={(achievements ?? []) as Achievement[]}
         thrustAreas={(thrustAreas ?? []) as ThrustArea[]}
+        parentOwnerByGoalId={parentOwnerByGoalId}
       />
     </div>
   );

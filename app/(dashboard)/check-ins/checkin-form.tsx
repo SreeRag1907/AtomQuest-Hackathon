@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Link2 } from "lucide-react";
 import { saveAllAchievements, type CheckinRowInput } from "./actions";
 import { computeScore } from "@/lib/scoring";
 import { UOM_LABELS } from "@/lib/validations/goal";
@@ -34,6 +35,7 @@ interface Props {
   goals: Goal[];
   achievements: Achievement[];
   thrustAreas: ThrustArea[];
+  parentOwnerByGoalId?: Record<string, string>;
 }
 
 interface RowState {
@@ -56,6 +58,7 @@ export function CheckinForm({
   goals,
   achievements,
   thrustAreas,
+  parentOwnerByGoalId,
 }: Props) {
   const taById = useMemo(() => new Map(thrustAreas.map((t) => [t.id, t])), [thrustAreas]);
   const router = useRouter();
@@ -79,12 +82,18 @@ export function CheckinForm({
 
   function save() {
     startTransition(async () => {
-      const payload: CheckinRowInput[] = rows.map((r) => ({
-        goal_id: r.goal_id,
-        actual_value: r.actual_value,
-        actual_date: r.actual_date,
-        status: r.status,
-      }));
+      // Skip child goals — those are auto-synced from the parent owner.
+      const editableGoalIds = new Set(
+        goals.filter((g) => !g.parent_goal_id).map((g) => g.id)
+      );
+      const payload: CheckinRowInput[] = rows
+        .filter((r) => editableGoalIds.has(r.goal_id))
+        .map((r) => ({
+          goal_id: r.goal_id,
+          actual_value: r.actual_value,
+          actual_date: r.actual_date,
+          status: r.status,
+        }));
       const res = await saveAllAchievements(sheetId, payload);
       if (!res.ok) {
         toast.error(res.error ?? "Failed to save");
@@ -121,9 +130,11 @@ export function CheckinForm({
         const isPercent = g.uom_type === "percent_min" || g.uom_type === "percent_max";
         const showDate = g.uom_type === "timeline";
         const showValue = g.uom_type !== "timeline";
+        const isChild = !!g.parent_goal_id;
+        const ownerName = isChild ? parentOwnerByGoalId?.[g.id] : undefined;
 
         return (
-          <Card key={g.id}>
+          <Card key={g.id} className={cn(isChild && "bg-muted/20")}>
             <CardContent className="grid gap-6 p-5 md:grid-cols-3">
               <div className="space-y-3 md:col-span-2">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -131,6 +142,12 @@ export function CheckinForm({
                     <div className="text-sm font-semibold">{g.title}</div>
                     {g.description && (
                       <div className="mt-1 text-xs text-muted-foreground">{g.description}</div>
+                    )}
+                    {isChild && (
+                      <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-2 py-1 text-[11px] text-muted-foreground">
+                        <Link2 className="h-3 w-3" />
+                        Auto-synced from {ownerName ?? "primary owner"}
+                      </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -169,6 +186,7 @@ export function CheckinForm({
                         type="date"
                         value={row.actual_date ?? ""}
                         onChange={(e) => patch(g.id, { actual_date: e.target.value || null })}
+                        disabled={isChild}
                       />
                     ) : (
                       <Input
@@ -180,6 +198,7 @@ export function CheckinForm({
                             actual_value: e.target.value === "" ? null : Number(e.target.value),
                           })
                         }
+                        disabled={isChild}
                       />
                     )}
                   </div>
@@ -189,6 +208,7 @@ export function CheckinForm({
                     <Select
                       value={row.status}
                       onValueChange={(v) => patch(g.id, { status: v as AchievementStatus })}
+                      disabled={isChild}
                     >
                       <SelectTrigger>
                         <SelectValue />

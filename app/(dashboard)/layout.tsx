@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { CommandPalette } from "@/components/command-palette";
+import { NavProgress } from "@/components/nav-progress";
 import { requireProfile } from "@/lib/auth";
 
 export default async function DashboardLayout({
@@ -13,6 +15,9 @@ export default async function DashboardLayout({
 
   return (
     <TooltipProvider delayDuration={200}>
+      <Suspense fallback={null}>
+        <NavProgress />
+      </Suspense>
       <div className="flex min-h-screen bg-background text-foreground">
         <Sidebar profile={profile} />
         <div className="flex min-w-0 flex-1 flex-col">

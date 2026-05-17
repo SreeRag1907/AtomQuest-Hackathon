@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
+import { profilesVisibleToViewer } from "@/lib/auth-visibility";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SubmissionFunnel, QuarterlyBars, PendingList } from "./completion-charts";
@@ -13,7 +14,7 @@ import type {
 } from "@/types/database";
 
 export default async function CompletionReportPage() {
-  await requireProfile();
+  const me = await requireProfile();
   const supabase = await createClient();
 
   const { data: cycle } = await supabase
@@ -22,16 +23,20 @@ export default async function CompletionReportPage() {
     .eq("is_active", true)
     .single<Cycle>();
 
-  const { data: profiles } = await supabase
+  const { data: profilesRaw } = await supabase
     .from("profiles")
     .select("*")
     .eq("role", "employee");
 
-  const { data: sheets } = cycle
+  const profiles = profilesVisibleToViewer((profilesRaw ?? []) as Profile[], me);
+  const visibleEmployeeIds = new Set(profiles.map((p) => p.id));
+
+  const { data: sheetsAll } = cycle
     ? await supabase.from("goal_sheets").select("*").eq("cycle_id", cycle.id)
     : { data: [] as GoalSheet[] };
+  const sheets = (sheetsAll ?? []).filter((s) => visibleEmployeeIds.has(s.employee_id));
 
-  const sheetIds = (sheets ?? []).map((s) => s.id);
+  const sheetIds = sheets.map((s) => s.id);
   const { data: goals } = sheetIds.length
     ? await supabase.from("goals").select("*").in("goal_sheet_id", sheetIds)
     : { data: [] as Goal[] };
@@ -42,12 +47,12 @@ export default async function CompletionReportPage() {
     : { data: [] as Achievement[] };
 
   // Submission stats
-  const totalEmployees = (profiles ?? []).length;
+  const totalEmployees = profiles.length;
   const submittedEmployees = new Set(
-    (sheets ?? []).filter((s) => s.status !== "draft").map((s) => s.employee_id)
+    sheets.filter((s) => s.status !== "draft").map((s) => s.employee_id)
   ).size;
   const approvedEmployees = new Set(
-    (sheets ?? [])
+    sheets
       .filter((s) => ["approved", "locked"].includes(s.status))
       .map((s) => s.employee_id)
   ).size;
@@ -60,7 +65,7 @@ export default async function CompletionReportPage() {
     const employeesWithUpdates = new Set<string>();
     const employeesPending = new Set<string>();
 
-    (sheets ?? [])
+    sheets
       .filter((s) => ["approved", "locked"].includes(s.status))
       .forEach((s) => {
         const sheetGoals = (goals ?? []).filter((g) => g.goal_sheet_id === s.id);
@@ -91,7 +96,13 @@ export default async function CompletionReportPage() {
     <div className="space-y-6">
       <PageHeader
         title="Completion report"
-        description={`${cycle?.name ?? "Active cycle"} · org-wide submission and check-in completion`}
+        description={
+          me.role === "admin"
+            ? `${cycle?.name ?? "Active cycle"} · org-wide submission and check-in completion`
+            : me.role === "manager"
+              ? `${cycle?.name ?? "Active cycle"} · your team's submission and check-in completion`
+              : `${cycle?.name ?? "Active cycle"} · your submission and check-in status`
+        }
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -119,8 +130,8 @@ export default async function CompletionReportPage() {
         </CardHeader>
         <CardContent>
           <PendingList
-            profiles={(profiles ?? []) as Profile[]}
-            sheets={(sheets ?? []) as GoalSheet[]}
+            profiles={profiles as Profile[]}
+            sheets={sheets as GoalSheet[]}
           />
         </CardContent>
       </Card>

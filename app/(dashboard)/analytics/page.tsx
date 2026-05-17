@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
+import { profilesVisibleToViewer } from "@/lib/auth-visibility";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { computeScore } from "@/lib/scoring";
@@ -27,7 +28,7 @@ import type {
 const QUARTERS: Quarter[] = ["q1", "q2", "q3", "q4"];
 
 export default async function AnalyticsPage() {
-  await requireProfile();
+  const me = await requireProfile();
   const supabase = await createClient();
 
   const { data: cycle } = await supabase
@@ -36,7 +37,8 @@ export default async function AnalyticsPage() {
     .eq("is_active", true)
     .single<Cycle>();
 
-  const { data: profiles } = await supabase.from("profiles").select("*");
+  const { data: profilesRaw } = await supabase.from("profiles").select("*");
+  const profiles = profilesVisibleToViewer((profilesRaw ?? []) as Profile[], me);
   const { data: sheets } = cycle
     ? await supabase.from("goal_sheets").select("*").eq("cycle_id", cycle.id)
     : { data: [] as GoalSheet[] };
@@ -50,7 +52,7 @@ export default async function AnalyticsPage() {
     : { data: [] as Achievement[] };
   const { data: thrustAreas } = await supabase.from("thrust_areas").select("*");
 
-  const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const profileById = new Map(profiles.map((p) => [p.id, p]));
   const sheetByEmpId = new Map((sheets ?? []).map((s) => [s.employee_id, s]));
 
   // Section 1: Org KPIs + QoQ
@@ -104,11 +106,11 @@ export default async function AnalyticsPage() {
   ).map(([k, v]) => ({ name: UOM_LABELS[k as keyof typeof UOM_LABELS] ?? k, value: v }));
 
   const departments = Array.from(
-    new Set((profiles ?? []).map((p) => p.department).filter(Boolean) as string[])
+    new Set(profiles.map((p) => p.department).filter(Boolean) as string[])
   );
   const statusByDept = departments.map((d) => {
     const counts = { department: d, draft: 0, submitted: 0, approved: 0, locked: 0, returned: 0 };
-    (profiles ?? [])
+    profiles
       .filter((p) => p.department === d)
       .forEach((p) => {
         const s = sheetByEmpId.get(p.id);
@@ -124,7 +126,7 @@ export default async function AnalyticsPage() {
   const heatmap = departments.map((d) => {
     const cells = QUARTERS.map((q) => {
       const scores: number[] = [];
-      (profiles ?? [])
+      profiles
         .filter((p) => p.department === d)
         .forEach((p) => {
           const s = sheetByEmpId.get(p.id);
@@ -147,9 +149,9 @@ export default async function AnalyticsPage() {
   });
 
   // Section 4: Manager effectiveness
-  const managers = (profiles ?? []).filter((p) => p.role === "manager");
-  const managerStats = managers.map((m) => {
-    const reports = (profiles ?? []).filter((p) => p.manager_id === m.id);
+  const managers = profiles.filter((p) => p.role === "manager");
+  let managerStats = managers.map((m) => {
+    const reports = profiles.filter((p) => p.manager_id === m.id);
     const reportSheets = reports
       .map((r) => sheetByEmpId.get(r.id))
       .filter(Boolean) as GoalSheet[];
@@ -186,8 +188,14 @@ export default async function AnalyticsPage() {
     };
   });
 
+  if (me.role === "manager") {
+    managerStats = managerStats.filter((row) => row.manager.id === me.id);
+  } else if (me.role === "employee") {
+    managerStats = [];
+  }
+
   // Section 5: Drill-down employee data (passed to client component)
-  const employeeData = (profiles ?? [])
+  const employeeData = profiles
     .filter((p) => p.role === "employee")
     .map((p) => {
       const s = sheetByEmpId.get(p.id);
@@ -222,13 +230,19 @@ export default async function AnalyticsPage() {
     <div className="space-y-8">
       <PageHeader
         title="Analytics"
-        description={`${cycle?.name ?? "Active cycle"} · org-wide insights`}
+        description={
+          me.role === "admin"
+            ? `${cycle?.name ?? "Active cycle"} · org-wide insights`
+            : me.role === "manager"
+              ? `${cycle?.name ?? "Active cycle"} · your team (direct reports)`
+              : `${cycle?.name ?? "Active cycle"} · your goals`
+        }
       />
 
       {/* Section 1: Organization Overview */}
       <section className="space-y-4">
         <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-          Organization overview
+          {me.role === "admin" ? "Organization overview" : me.role === "manager" ? "Team overview" : "Your overview"}
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard label="Avg achievement score" value={avgScore != null ? `${Math.round(avgScore)}%` : "—"} accent="primary" />
@@ -292,14 +306,16 @@ export default async function AnalyticsPage() {
       </section>
 
       {/* Section 4: Manager Effectiveness */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-          Manager effectiveness
-        </h2>
-        <Card>
-          <ManagerEffectiveness data={managerStats} />
-        </Card>
-      </section>
+      {managerStats.length > 0 ? (
+        <section className="space-y-4">
+          <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+            {me.role === "admin" ? "Manager effectiveness" : "Your effectiveness"}
+          </h2>
+          <Card>
+            <ManagerEffectiveness data={managerStats} />
+          </Card>
+        </section>
+      ) : null}
 
       {/* Section 5: Drill-down */}
       <section className="space-y-4">

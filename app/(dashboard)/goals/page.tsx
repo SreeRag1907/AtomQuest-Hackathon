@@ -178,6 +178,17 @@ export default async function GoalsListPage() {
             </div>
           )}
 
+          {goals && goals.length === 0 && (
+            <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
+              No goals on this sheet yet.{" "}
+              {["draft", "returned"].includes(sheet.status) && (
+                <Link href={`/goals/${sheet.id}`} className="text-primary hover:underline">
+                  Start adding goals →
+                </Link>
+              )}
+            </div>
+          )}
+
           {goals && goals.length > 0 && (
             <Card>
               <Table>
@@ -203,7 +214,7 @@ export default async function GoalsListPage() {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs">{UOM_LABELS[g.uom_type as keyof typeof UOM_LABELS]}</TableCell>
+                      <TableCell className="text-xs">{UOM_LABELS[g.uom_type as keyof typeof UOM_LABELS] ?? g.uom_type ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">
                         {g.uom_type === "timeline"
                           ? g.target_date

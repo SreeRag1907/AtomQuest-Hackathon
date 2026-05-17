@@ -50,7 +50,7 @@ export default async function TeamMemberPage({
     .from("cycles")
     .select("*")
     .eq("is_active", true)
-    .single<Cycle>();
+    .maybeSingle<Cycle>();
 
   const { data: sheet } = cycle
     ? await supabase

@@ -189,18 +189,22 @@ export function AchievementReport({
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2 border-b p-3">
-        <Select value={cycleId} onValueChange={setCycleId}>
-          <SelectTrigger className="h-8 w-40">
-            <SelectValue placeholder="Cycle" />
-          </SelectTrigger>
-          <SelectContent>
-            {cycles.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {cycles.length > 0 ? (
+          <Select value={cycleId} onValueChange={setCycleId}>
+            <SelectTrigger className="h-8 w-40">
+              <SelectValue placeholder="Cycle" />
+            </SelectTrigger>
+            <SelectContent>
+              {cycles.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <span className="text-xs text-muted-foreground">No cycles yet</span>
+        )}
         <Select value={department} onValueChange={setDepartment}>
           <SelectTrigger className="h-8 w-40">
             <SelectValue placeholder="Department" />
@@ -278,6 +282,13 @@ export function AchievementReport({
             </TableRow>
           </TableHeader>
           <TableBody>
+            {rows.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8 + QUARTERS.length} className="py-8 text-center text-sm text-muted-foreground">
+                  No goals match the selected filters.
+                </TableCell>
+              </TableRow>
+            )}
             {rows.map((r) => (
               <TableRow key={r.goal.id}>
                 <TableCell className="text-sm">
@@ -289,7 +300,7 @@ export function AchievementReport({
                   {r.goal.thrust_area_id ? taById.get(r.goal.thrust_area_id)?.name : "—"}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {UOM_LABELS[r.goal.uom_type as keyof typeof UOM_LABELS]}
+                  {UOM_LABELS[r.goal.uom_type as keyof typeof UOM_LABELS] ?? r.goal.uom_type ?? "—"}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {r.goal.uom_type === "timeline"

@@ -107,7 +107,12 @@ export function CheckinForm({
   return (
     <div className="space-y-4">
       {goals.map((g) => {
-        const row = rows.find((r) => r.goal_id === g.id)!;
+        const row = rows.find((r) => r.goal_id === g.id) ?? {
+          goal_id: g.id,
+          actual_value: null,
+          actual_date: null,
+          status: "not_started" as const,
+        };;
         const previewAchievement: Achievement = {
           id: "preview",
           goal_id: g.id,
@@ -160,7 +165,7 @@ export function CheckinForm({
 
                 <div className="flex flex-wrap gap-x-6 gap-y-1 border-t pt-3 text-xs">
                   <span className="text-muted-foreground">
-                    UoM: <span className="text-foreground">{UOM_LABELS[g.uom_type as keyof typeof UOM_LABELS]}</span>
+                    UoM: <span className="text-foreground">{UOM_LABELS[g.uom_type as keyof typeof UOM_LABELS] ?? g.uom_type ?? "—"}</span>
                   </span>
                   <span className="text-muted-foreground">
                     Target:{" "}

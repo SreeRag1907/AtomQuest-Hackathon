@@ -11,13 +11,17 @@ import type { Profile, GoalSheet, Cycle } from "@/types/database";
 export async function AdminDashboard({ profile }: { profile: Profile }) {
   const supabase = await createClient();
 
-  const [{ data: cycle }, { data: profiles }, { data: sheets }, { data: recentAudit }] =
+  const [{ data: cycle }, { data: profiles }, { data: recentAudit }] =
     await Promise.all([
-      supabase.from("cycles").select("*").eq("is_active", true).single<Cycle>(),
+      supabase.from("cycles").select("*").eq("is_active", true).maybeSingle<Cycle>(),
       supabase.from("profiles").select("*"),
-      supabase.from("goal_sheets").select("*"),
       supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(8),
     ]);
+
+  // Scope sheet metrics to the active cycle so KPIs are cycle-accurate
+  const { data: sheets } = cycle
+    ? await supabase.from("goal_sheets").select("*").eq("cycle_id", cycle.id)
+    : { data: [] as GoalSheet[] };
 
   const totalUsers = (profiles ?? []).length;
   const totalSheets = (sheets ?? []).length;
@@ -40,7 +44,7 @@ export async function AdminDashboard({ profile }: { profile: Profile }) {
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Admin overview, {profile.full_name.split(" ")[0]}
+          Admin overview, {profile.full_name?.split(" ")[0] || "there"}
         </h1>
         <p className="text-sm text-muted-foreground">Org-wide health, governance, and cycle controls</p>
       </div>
@@ -123,7 +127,7 @@ export async function AdminDashboard({ profile }: { profile: Profile }) {
                   </Badge>
                   <span className="font-medium">{a.action}</span>
                   <span className="font-mono text-xs text-muted-foreground">
-                    {a.entity_id.slice(0, 8)}…
+                    {a.entity_id?.slice(0, 8) ?? "—"}…
                   </span>
                   <span className="ml-auto text-xs text-muted-foreground">
                     {new Date(a.created_at).toLocaleString()}

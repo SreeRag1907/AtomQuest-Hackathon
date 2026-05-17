@@ -42,6 +42,26 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [resetSent, setResetSent] = useState(false);
+
+  function sendPasswordReset() {
+    if (!email) {
+      toast.error("Enter your email address first");
+      return;
+    }
+    startTransition(async () => {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/update-password`,
+      });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      setResetSent(true);
+      toast.success("Password reset email sent — check your inbox");
+    });
+  }
 
   function signIn(emailOverride?: string, passwordOverride?: string) {
     const e = emailOverride ?? email;
@@ -57,7 +77,10 @@ export function LoginForm() {
         toast.error(error.message);
         return;
       }
-      const from = searchParams.get("from") ?? "/dashboard";
+      const rawFrom = searchParams.get("from") ?? "";
+      // Guard against open redirects: only allow internal paths (must start with /)
+      const from =
+        rawFrom.startsWith("/") && !rawFrom.startsWith("//") ? rawFrom : "/dashboard";
       router.replace(from);
       router.refresh();
     });
@@ -79,8 +102,10 @@ export function LoginForm() {
 
   // A `from` param means middleware redirected the user here — either their
   // session expired or they tried to access a protected route while signed out.
-  const redirectedFrom = searchParams.get("from");
-  const showSessionBanner = !!redirectedFrom && redirectedFrom !== "/";
+  const redirectedFrom = searchParams.get("from") ?? "";
+  // Only show the banner when a legitimate internal path triggered the redirect
+  const showSessionBanner =
+    redirectedFrom.startsWith("/") && !redirectedFrom.startsWith("//") && redirectedFrom !== "/";
 
   return (
     <div className="space-y-6">
@@ -116,9 +141,14 @@ export function LoginForm() {
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>
-            <Link href="#" className="text-xs text-muted-foreground hover:text-foreground">
-              Forgot password?
-            </Link>
+            <button
+              type="button"
+              onClick={sendPasswordReset}
+              disabled={isPending}
+              className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+            >
+              {resetSent ? "Email sent ✓" : "Forgot password?"}
+            </button>
           </div>
           <div className="relative">
             <Input

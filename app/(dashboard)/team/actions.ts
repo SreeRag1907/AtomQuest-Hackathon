@@ -106,8 +106,12 @@ export async function approveGoalSheet(sheetId: string): Promise<Result> {
 }
 
 export async function returnGoalSheet(sheetId: string, reason: string): Promise<Result> {
-  if (!reason || reason.trim().length < 5) {
+  const trimmedReason = reason?.trim() ?? "";
+  if (trimmedReason.length < 5) {
     return { ok: false, error: "Provide a reason (5+ chars) so the employee can act on it." };
+  }
+  if (trimmedReason.length > 1000) {
+    return { ok: false, error: "Reason must be 1000 characters or fewer." };
   }
   const auth = await authManager();
   if ("error" in auth) return { ok: false, error: auth.error };
@@ -279,13 +283,22 @@ export async function managerUpdateGoals(
   return { ok: true };
 }
 
+const VALID_QUARTERS = ["q1", "q2", "q3", "q4"] as const;
+
 export async function saveCheckinComment(
   sheetId: string,
   quarter: string,
   comment: string
 ): Promise<Result> {
-  if (!comment || comment.trim().length < 1) {
+  if (!VALID_QUARTERS.includes(quarter as (typeof VALID_QUARTERS)[number])) {
+    return { ok: false, error: "Invalid quarter" };
+  }
+  const trimmed = comment?.trim() ?? "";
+  if (trimmed.length < 1) {
     return { ok: false, error: "Comment cannot be empty" };
+  }
+  if (trimmed.length > 2000) {
+    return { ok: false, error: "Comment must be 2000 characters or fewer." };
   }
   const auth = await authManager();
   if ("error" in auth) return { ok: false, error: auth.error };

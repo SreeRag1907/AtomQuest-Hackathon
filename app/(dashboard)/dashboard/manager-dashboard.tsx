@@ -16,7 +16,7 @@ export async function ManagerDashboard({ profile }: { profile: Profile }) {
     .from("cycles")
     .select("*")
     .eq("is_active", true)
-    .single<Cycle>();
+    .maybeSingle<Cycle>();
 
   const { data: team } = await supabase
     .from("profiles")
@@ -64,7 +64,7 @@ export async function ManagerDashboard({ profile }: { profile: Profile }) {
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Hello, {profile.full_name.split(" ")[0]}
+          Hello, {profile.full_name?.split(" ")[0] || "there"}
         </h1>
         <p className="text-sm text-muted-foreground">Manager view · {team?.length ?? 0} direct reports</p>
       </div>
@@ -139,17 +139,21 @@ export async function ManagerDashboard({ profile }: { profile: Profile }) {
                         <span className="truncate font-medium">{row.member.full_name}</span>
                         {row.sheet && <GoalStatusBadge status={row.sheet.status} />}
                       </div>
-                      <Progress
-                        value={row.score ?? 0}
-                        className="mt-1.5 h-1.5"
-                        indicatorClassName={
-                          row.score && row.score >= 80
-                            ? "bg-success"
-                            : row.score && row.score >= 50
-                              ? "bg-warning"
-                              : "bg-primary"
-                        }
-                      />
+                      {row.score != null ? (
+                        <Progress
+                          value={row.score}
+                          className="mt-1.5 h-1.5"
+                          indicatorClassName={
+                            row.score >= 80
+                              ? "bg-success"
+                              : row.score >= 50
+                                ? "bg-warning"
+                                : "bg-primary"
+                          }
+                        />
+                      ) : (
+                        <div className="mt-1.5 h-1.5 rounded-full bg-muted" />
+                      )}
                     </div>
                     <div className="w-12 text-right text-xs tabular-nums text-muted-foreground">
                       {row.score == null ? "—" : `${Math.round(row.score)}%`}

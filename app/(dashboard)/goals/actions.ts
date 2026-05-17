@@ -23,6 +23,7 @@ export interface GoalDraftInput {
   target: number | null;
   target_date: string | null;
   weightage: number | null;
+  parent_goal_id?: string | null;
 }
 import { isGoalSettingPhase } from "@/lib/cycle";
 import type { Cycle, GoalSheet, Profile } from "@/types/database";
@@ -112,6 +113,11 @@ export async function saveDraft(
   if (sheet.employee_id !== auth.profile.id) return { ok: false, error: "Not authorized" };
   if (!["draft", "returned"].includes(sheet.status)) {
     return { ok: false, error: "This sheet is no longer editable" };
+  }
+
+  const nonChildGoals = goals.filter((g) => !g.parent_goal_id);
+  if (nonChildGoals.length > 8) {
+    return { ok: false, error: "Maximum 8 goals per sheet" };
   }
 
   return await replaceGoals(sheetId, goals);

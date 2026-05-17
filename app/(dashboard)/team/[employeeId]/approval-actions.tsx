@@ -79,10 +79,17 @@ export function ApprovalActions({ sheetId, employeeName }: Props) {
         </div>
       </Card>
 
-      <Dialog open={returnOpen} onOpenChange={setReturnOpen}>
+      <Dialog
+        open={returnOpen}
+        onOpenChange={(open) => {
+          if (isReturning) return; // prevent close while submitting
+          if (!open) setReason(""); // clear on close so old text doesn't linger
+          setReturnOpen(open);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Return {employeeName}'s goals for rework</DialogTitle>
+            <DialogTitle>Return {employeeName}&apos;s goals for rework</DialogTitle>
             <DialogDescription>
               The employee will get a notification with this reason and can re-submit.
             </DialogDescription>
@@ -95,10 +102,16 @@ export function ApprovalActions({ sheetId, employeeName }: Props) {
               onChange={(e) => setReason(e.target.value)}
               placeholder="Be specific so the employee knows what to change..."
               rows={4}
+              maxLength={1000}
             />
+            <p className="text-right text-[10px] text-muted-foreground">{reason.length}/1000</p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReturnOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => { setReason(""); setReturnOpen(false); }}
+              disabled={isReturning}
+            >
               Cancel
             </Button>
             <Button

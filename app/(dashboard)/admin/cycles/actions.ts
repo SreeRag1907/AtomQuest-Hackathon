@@ -33,19 +33,46 @@ async function requireAdmin() {
   return { user };
 }
 
-const cycleSchema = z.object({
-  name: z.string().min(2, "Name is required"),
-  goal_setting_opens: z.string().nullable(),
-  goal_setting_closes: z.string().nullable(),
-  q1_opens: z.string().nullable(),
-  q1_closes: z.string().nullable(),
-  q2_opens: z.string().nullable(),
-  q2_closes: z.string().nullable(),
-  q3_opens: z.string().nullable(),
-  q3_closes: z.string().nullable(),
-  q4_opens: z.string().nullable(),
-  q4_closes: z.string().nullable(),
-});
+const dateOrNull = z
+  .string()
+  .nullable()
+  .refine(
+    (v) => v === null || v === "" || !isNaN(Date.parse(v)),
+    "Invalid date"
+  )
+  .transform((v) => (v === "" ? null : v));
+
+const cycleSchema = z
+  .object({
+    name: z.string().min(2, "Name is required"),
+    goal_setting_opens: dateOrNull,
+    goal_setting_closes: dateOrNull,
+    q1_opens: dateOrNull,
+    q1_closes: dateOrNull,
+    q2_opens: dateOrNull,
+    q2_closes: dateOrNull,
+    q3_opens: dateOrNull,
+    q3_closes: dateOrNull,
+    q4_opens: dateOrNull,
+    q4_closes: dateOrNull,
+  })
+  .superRefine((d, ctx) => {
+    const pairs: Array<[string, string | null, string, string | null]> = [
+      ["Goal-setting opens", d.goal_setting_opens, "Goal-setting closes", d.goal_setting_closes],
+      ["Q1 opens", d.q1_opens, "Q1 closes", d.q1_closes],
+      ["Q2 opens", d.q2_opens, "Q2 closes", d.q2_closes],
+      ["Q3 opens", d.q3_opens, "Q3 closes", d.q3_closes],
+      ["Q4 opens", d.q4_opens, "Q4 closes", d.q4_closes],
+    ];
+    for (const [openLabel, opens, closeLabel, closes] of pairs) {
+      if (opens && closes && new Date(opens) > new Date(closes)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${openLabel} must be before ${closeLabel}`,
+        });
+      }
+    }
+  });
 
 export async function createCycle(input: z.infer<typeof cycleSchema>): Promise<Result> {
   const auth = await requireAdmin();

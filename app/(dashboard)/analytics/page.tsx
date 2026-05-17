@@ -70,8 +70,9 @@ export default async function AnalyticsPage() {
       if (s != null) allScores.push(s);
     });
   });
-  const avgScore =
-    allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : 0;
+  const avgScoreRaw =
+    allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : null;
+  const avgScore = avgScoreRaw;
   const onTrackPct = (achievements ?? []).length
     ? Math.round(((onTrackCount + completedCount) / (achievements ?? []).length) * 100)
     : 0;
@@ -111,7 +112,10 @@ export default async function AnalyticsPage() {
       .filter((p) => p.department === d)
       .forEach((p) => {
         const s = sheetByEmpId.get(p.id);
-        if (s) counts[s.status as "draft" | "submitted" | "approved" | "locked" | "returned"]++;
+        if (s) {
+          const key = s.status as "draft" | "submitted" | "approved" | "locked" | "returned";
+          if (key in counts) counts[key]++;
+        }
       });
     return counts;
   });
@@ -227,7 +231,7 @@ export default async function AnalyticsPage() {
           Organization overview
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard label="Avg achievement score" value={`${Math.round(avgScore)}%`} accent="primary" />
+          <KpiCard label="Avg achievement score" value={avgScore != null ? `${Math.round(avgScore)}%` : "—"} accent="primary" />
           <KpiCard label="On-track / completed" value={`${onTrackPct}%`} accent="success" />
           <KpiCard label="At-risk goals" value={atRiskCount} accent="warning" />
           <KpiCard label="Total goals" value={(goals ?? []).length} accent="primary" />

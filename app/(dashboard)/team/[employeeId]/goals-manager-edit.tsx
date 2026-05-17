@@ -276,14 +276,11 @@ export function GoalsManagerEdit({ sheetId, goals, thrustAreas }: Props) {
                           type="number"
                           step="any"
                           value={r.target ?? ""}
-                          onChange={(e) =>
-                            patch(r.id, {
-                              target:
-                                e.target.value === ""
-                                  ? null
-                                  : Number(e.target.value),
-                            })
-                          }
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const n = v === "" ? null : parseFloat(v);
+                            patch(r.id, { target: n != null && !isNaN(n) ? n : null });
+                          }}
                         />
                       ) : (
                         <span>{r.target ?? "—"}</span>
@@ -299,11 +296,10 @@ export function GoalsManagerEdit({ sheetId, goals, thrustAreas }: Props) {
                         min={1}
                         max={100}
                         value={r.weightage}
-                        onChange={(e) =>
-                          patch(r.id, {
-                            weightage: Number(e.target.value || 0),
-                          })
-                        }
+                        onChange={(e) => {
+                          const n = parseInt(e.target.value, 10);
+                          if (!isNaN(n) && n >= 0 && n <= 100) patch(r.id, { weightage: n });
+                        }}
                       />
                     ) : (
                       <Badge variant="muted">{r.weightage}%</Badge>

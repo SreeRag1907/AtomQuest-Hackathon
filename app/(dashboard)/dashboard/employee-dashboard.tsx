@@ -55,7 +55,7 @@ export async function EmployeeDashboard({ profile }: { profile: Profile }) {
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Welcome back, {profile.full_name.split(" ")[0]}
+          Welcome back, {profile.full_name?.split(" ")[0] || "there"}
         </h1>
         <p className="text-sm text-muted-foreground">
           {new Date().toLocaleDateString("en-US", {
@@ -152,17 +152,21 @@ export async function EmployeeDashboard({ profile }: { profile: Profile }) {
                     <li key={g.id} className="flex items-center gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">{g.title}</div>
-                        <Progress
-                          value={score ?? 0}
-                          className="mt-1.5 h-1.5"
-                          indicatorClassName={
-                            score && score >= 80
-                              ? "bg-success"
-                              : score && score >= 50
-                                ? "bg-warning"
-                                : "bg-primary"
-                          }
-                        />
+                        {score != null ? (
+                          <Progress
+                            value={score}
+                            className="mt-1.5 h-1.5"
+                            indicatorClassName={
+                              score >= 80
+                                ? "bg-success"
+                                : score >= 50
+                                  ? "bg-warning"
+                                  : "bg-primary"
+                            }
+                          />
+                        ) : (
+                          <div className="mt-1.5 h-1.5 rounded-full bg-muted" />
+                        )}
                       </div>
                       <div className="w-12 text-right text-xs tabular-nums text-muted-foreground">
                         {score == null ? "—" : `${Math.round(score)}%`}

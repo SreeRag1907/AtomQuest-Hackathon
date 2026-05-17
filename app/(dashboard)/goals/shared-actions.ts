@@ -37,7 +37,7 @@ async function getCaller() {
 export async function pushSharedGoal(
   parentGoalId: string,
   recipientIds: string[],
-  defaultWeightage = 5
+  defaultWeightage = 10
 ): Promise<ActionResult> {
   const caller = await getCaller();
   if ("error" in caller) return { ok: false, error: caller.error };
@@ -214,9 +214,9 @@ export async function removeSharedRecipients(
 
   const { data: parentGoal } = await supabase
     .from("goals")
-    .select("*, goal_sheets(employee_id)")
+    .select("*, goal_sheets(employee_id, cycle_id)")
     .eq("id", parentGoalId)
-    .single<Goal & { goal_sheets: { employee_id: string } }>();
+    .single<Goal & { goal_sheets: { employee_id: string; cycle_id: string } }>();
   if (!parentGoal) return { ok: false, error: "Parent goal not found" };
   if (
     caller.profile.role !== "admin" &&
@@ -225,10 +225,12 @@ export async function removeSharedRecipients(
     return { ok: false, error: "Not authorized" };
   }
 
+  // Scope sheet lookup to the same cycle so we never delete from a different cycle's sheet
   const { data: sheets } = await supabase
     .from("goal_sheets")
     .select("id, employee_id")
-    .in("employee_id", recipientIds);
+    .in("employee_id", recipientIds)
+    .eq("cycle_id", parentGoal.goal_sheets.cycle_id);
   const sheetIds = (sheets ?? []).map((s) => s.id);
 
   if (sheetIds.length > 0) {

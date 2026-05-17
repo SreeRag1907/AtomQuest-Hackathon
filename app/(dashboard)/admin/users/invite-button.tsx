@@ -48,7 +48,14 @@ export function InviteButton({ managers: _managers }: Props) {
         toast.error(r.error ?? "Failed");
         return;
       }
-      toast.success(`Invite sent to ${form.email}`);
+      if (r.devPassword) {
+        toast.success("User created — no email sent (dev bypass).", {
+          duration: 45_000,
+          description: `Password for ${form.email}: ${r.devPassword}`,
+        });
+      } else {
+        toast.success(`Invite sent to ${form.email}`);
+      }
       setOpen(false);
       setForm({ email: "", fullName: "", role: "employee", department: "" });
       router.refresh();

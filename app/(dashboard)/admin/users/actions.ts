@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import type { UserRole } from "@/types/database";
@@ -7,6 +8,12 @@ import type { UserRole } from "@/types/database";
 interface Result {
   ok: boolean;
   error?: string;
+  /** Set when AUTH_DEV_CREATE_USER_WITHOUT_EMAIL creates a user (no invite email). */
+  devPassword?: string;
+}
+
+function devCreateWithoutEmail(): boolean {
+  return process.env.AUTH_DEV_CREATE_USER_WITHOUT_EMAIL === "true";
 }
 
 async function requireAdmin() {
@@ -43,6 +50,24 @@ export async function inviteUser(email: string, fullName: string, role: UserRole
   }
   try {
     const supabase = await createServiceClient();
+    if (devCreateWithoutEmail()) {
+      const password =
+        process.env.AUTH_DEV_NEW_USER_PASSWORD?.trim() ||
+        randomBytes(12).toString("base64url");
+      const { error } = await supabase.auth.admin.createUser({
+        email: email.trim(),
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: fullName,
+          role,
+          ...(department ? { department } : {}),
+        },
+      });
+      if (error) return { ok: false, error: error.message };
+      revalidatePath("/admin/users");
+      return { ok: true, devPassword: password };
+    }
     const { error } = await supabase.auth.admin.inviteUserByEmail(email, {
       data: { full_name: fullName, role, department },
       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/login`,

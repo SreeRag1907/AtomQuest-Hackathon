@@ -3,6 +3,7 @@ import { Atom } from "lucide-react";
 import { SignupForm } from "./signup-form";
 
 export default function SignupPage() {
+  const devEmailBypass = process.env.AUTH_DEV_CREATE_USER_WITHOUT_EMAIL === "true";
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="relative hidden overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-900 p-10 text-white lg:flex lg:flex-col lg:justify-between">
@@ -29,7 +30,7 @@ export default function SignupPage() {
             <p className="text-sm text-muted-foreground">It only takes a minute.</p>
           </div>
 
-          <SignupForm />
+          <SignupForm devEmailBypass={devEmailBypass} />
 
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}

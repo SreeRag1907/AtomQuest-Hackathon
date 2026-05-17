@@ -17,7 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { GoalStatusBadge } from "@/components/status-badge";
 import { CycleBanner } from "@/components/cycle-banner";
-import { isCheckinPhase, isGoalSettingPhase, phaseLabel } from "@/lib/cycle";
+import { isCheckinPhase, isGoalSettingWindowOpen, phaseLabel } from "@/lib/cycle";
 import { UOM_LABELS } from "@/lib/validations/goal";
 import type { Cycle, GoalSheet, Goal, ThrustArea } from "@/types/database";
 
@@ -73,7 +73,7 @@ export default async function GoalsListPage() {
         title="My goals"
         description={`${cycle.name} · ${phaseLabel(cycle.current_phase)}`}
         actions={
-          !sheet && isGoalSettingPhase(cycle.current_phase) ? (
+          !sheet && isGoalSettingWindowOpen(cycle) ? (
             <Button asChild>
               <Link href="/goals/new">
                 <Plus className="h-4 w-4" />
@@ -87,7 +87,7 @@ export default async function GoalsListPage() {
       <CycleBanner cycle={cycle} />
 
       {!sheet ? (
-        isGoalSettingPhase(cycle.current_phase) ? (
+        isGoalSettingWindowOpen(cycle) ? (
           <EmptyState
             icon={ClipboardList}
             title="Create your goal sheet"

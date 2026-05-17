@@ -293,12 +293,12 @@ export function GoalsManagerEdit({ sheetId, goals, thrustAreas }: Props) {
                     {editing && !lockChild ? (
                       <Input
                         type="number"
-                        min={1}
+                        min={10}
                         max={100}
                         value={r.weightage}
                         onChange={(e) => {
                           const n = parseInt(e.target.value, 10);
-                          if (!isNaN(n) && n >= 0 && n <= 100) patch(r.id, { weightage: n });
+                          if (!isNaN(n) && n >= 10 && n <= 100) patch(r.id, { weightage: n });
                         }}
                       />
                     ) : (

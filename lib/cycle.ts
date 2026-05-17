@@ -60,3 +60,10 @@ export function isCheckinPhase(phase: CyclePhase): boolean {
 export function isGoalSettingPhase(phase: CyclePhase): boolean {
   return phase === "goal_setting";
 }
+
+/** True only when the phase is goal_setting AND the window hasn't closed yet. */
+export function isGoalSettingWindowOpen(cycle: Cycle): boolean {
+  if (cycle.current_phase !== "goal_setting") return false;
+  const days = daysUntil(cycle.goal_setting_closes);
+  return days === null || days >= 0;
+}

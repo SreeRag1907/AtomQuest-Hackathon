@@ -64,11 +64,11 @@ update profiles set manager_id = '11111111-1111-1111-1111-111111111111' where ro
 insert into cycles (id, name, current_phase, goal_setting_opens, goal_setting_closes, q1_opens, q1_closes, q2_opens, q2_closes, q3_opens, q3_closes, q4_opens, q4_closes, is_active)
 values
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'FY2026', 'q2',
-    '2026-03-15', '2026-04-10',
-    '2026-04-01', '2026-07-15',
-    '2026-07-01', '2026-10-15',
-    '2026-10-01', '2027-01-15',
-    '2027-01-01', '2027-04-15',
+    '2026-05-01', '2026-05-31',
+    '2026-06-01', '2026-07-15',
+    '2026-07-16', '2026-10-15',
+    '2026-10-16', '2027-01-15',
+    '2027-01-16', '2027-04-15',
     true);
 
 -- ---- Thrust Areas ----

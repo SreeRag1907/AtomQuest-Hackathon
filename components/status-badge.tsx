@@ -18,7 +18,7 @@ const GOAL_STATUS_STYLES: Record<GoalStatus, { label: string; className: string;
     dot: "bg-success",
   },
   locked: {
-    label: "Locked",
+    label: "Approved & active",
     className: "bg-primary/10 text-primary",
     dot: "bg-primary",
   },

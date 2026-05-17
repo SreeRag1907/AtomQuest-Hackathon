@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -63,8 +63,22 @@ export function LoginForm() {
     });
   }
 
+  // A `from` param means middleware redirected the user here — either their
+  // session expired or they tried to access a protected route while signed out.
+  const redirectedFrom = searchParams.get("from");
+  const showSessionBanner = !!redirectedFrom && redirectedFrom !== "/";
+
   return (
     <div className="space-y-6">
+      {showSessionBanner && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Your session has expired or you were signed out. Please sign in again to continue.
+          </span>
+        </div>
+      )}
+
       <form
         onSubmit={(e) => {
           e.preventDefault();

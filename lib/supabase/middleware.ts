@@ -1,7 +1,25 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import type { AuthError } from "@supabase/supabase-js";
 
 const PUBLIC_ROUTES = new Set(["/login", "/signup", "/auth/callback", "/auth/error"]);
+
+/** Clear Supabase auth cookies when refresh fails (wrong project URL, revoked user, wiped DB). */
+function clearStaleSupabaseCookies(req: NextRequest, res: NextResponse): void {
+  const names = req.cookies.getAll().map((c) => c.name);
+  names.forEach((name) => {
+    // @supabase/ssr stores chunked auth cookies under sb-<projectRef>-...
+    if (name.startsWith("sb-")) {
+      res.cookies.set(name, "", {
+        path: "/",
+        maxAge: 0,
+        expires: new Date(0),
+        sameSite: "lax",
+        httpOnly: true,
+      });
+    }
+  });
+}
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -25,18 +43,45 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
-  const path = request.nextUrl.pathname;
-  const isPublic = PUBLIC_ROUTES.has(path) || path.startsWith("/_next") || path === "/favicon.ico";
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-  if (!user && !isPublic) {
+  const staleRefresh =
+    authError !== null &&
+    ((authError as AuthError).code === "refresh_token_not_found" ||
+      /refresh_token_not_found/i.test(authError.message));
+
+  /** Treat as logged out and drop invalid cookies so the client stops retrying refresh. */
+  const effectiveUser = staleRefresh ? null : user;
+
+  if (staleRefresh) {
+    clearStaleSupabaseCookies(request, supabaseResponse);
+    if (!process.env.SUPPRESS_AUTH_DEBUG) {
+      // One-line hint instead of dumping full AuthApiError stacks to the terminal.
+      console.warn(
+        "[auth] Cleared stale session cookies (refresh_token_not_found). Sign in again if needed."
+      );
+    }
+  }
+
+  const path = request.nextUrl.pathname;
+  const isPublic =
+    PUBLIC_ROUTES.has(path) || path.startsWith("/_next") || path === "/favicon.ico";
+
+  if (!effectiveUser && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("from", path);
-    return NextResponse.redirect(redirectUrl);
+    const redirectResponse = NextResponse.redirect(redirectUrl);
+    if (staleRefresh) {
+      clearStaleSupabaseCookies(request, redirectResponse);
+    }
+    return redirectResponse;
   }
 
-  if (user && (path === "/login" || path === "/signup")) {
+  if (effectiveUser && (path === "/login" || path === "/signup")) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/dashboard";
     redirectUrl.search = "";

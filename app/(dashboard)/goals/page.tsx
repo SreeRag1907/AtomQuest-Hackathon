@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList, Plus, FileEdit } from "lucide-react";
+import { CheckSquare, ClipboardList, FileEdit, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
@@ -17,7 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { GoalStatusBadge } from "@/components/status-badge";
 import { CycleBanner } from "@/components/cycle-banner";
-import { isGoalSettingPhase, phaseLabel } from "@/lib/cycle";
+import { isCheckinPhase, isGoalSettingPhase, phaseLabel } from "@/lib/cycle";
 import { UOM_LABELS } from "@/lib/validations/goal";
 import type { Cycle, GoalSheet, Goal, ThrustArea } from "@/types/database";
 
@@ -104,7 +104,21 @@ export default async function GoalsListPage() {
           <EmptyState
             icon={ClipboardList}
             title="Goal-setting window is closed"
-            description={`The current phase is ${phaseLabel(cycle.current_phase)}. Contact your admin if you need to set goals.`}
+            description={`The current phase is ${phaseLabel(cycle.current_phase)}.${
+              isCheckinPhase(cycle.current_phase)
+                ? " Use Check-ins to record your quarterly progress."
+                : " Contact your admin if you need to set goals."
+            }`}
+            action={
+              isCheckinPhase(cycle.current_phase) ? (
+                <Button asChild>
+                  <Link href="/check-ins">
+                    <CheckSquare className="h-4 w-4" />
+                    Go to Check-ins
+                  </Link>
+                </Button>
+              ) : undefined
+            }
           />
         )
       ) : (
@@ -118,20 +132,51 @@ export default async function GoalsListPage() {
                     <>Submitted {new Date(sheet.submitted_at).toLocaleDateString()}</>
                   )}
                   {sheet.locked_at && (
-                    <> · Locked {new Date(sheet.locked_at).toLocaleDateString()}</>
+                    <> · Finalized {new Date(sheet.locked_at).toLocaleDateString()}</>
                   )}
                 </div>
               </div>
-              <Button asChild variant="outline" size="sm">
-                <Link href={`/goals/${sheet.id}`}>
-                  <FileEdit className="h-4 w-4" />
-                  {["draft", "returned"].includes(sheet.status)
-                    ? "Continue editing"
-                    : "View details"}
-                </Link>
-              </Button>
+              <div className="flex items-center gap-2">
+                {["locked", "approved"].includes(sheet.status) && isCheckinPhase(cycle.current_phase) && (
+                  <Button asChild size="sm">
+                    <Link href="/check-ins">
+                      <CheckSquare className="h-4 w-4" />
+                      Go to Check-ins
+                    </Link>
+                  </Button>
+                )}
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/goals/${sheet.id}`}>
+                    <FileEdit className="h-4 w-4" />
+                    {["draft", "returned"].includes(sheet.status)
+                      ? "Continue editing"
+                      : "View goals"}
+                  </Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
+
+          {/* Info callout when goals are finalized and check-ins are open */}
+          {["locked", "approved"].includes(sheet.status) && isCheckinPhase(cycle.current_phase) && (
+            <div className="flex items-start gap-3 rounded-lg border border-primary/25 bg-primary/5 p-4">
+              <CheckSquare className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <div>
+                <p className="text-sm font-medium text-primary">
+                  Your goals are finalized — time to track progress
+                </p>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  The goal-setting window is closed. During{" "}
+                  <span className="font-medium">{phaseLabel(cycle.current_phase)}</span> you
+                  record your actual achievements in{" "}
+                  <Link href="/check-ins" className="font-medium text-primary underline-offset-2 hover:underline">
+                    Check-ins
+                  </Link>
+                  . Your goal list is read-only until the next cycle opens.
+                </p>
+              </div>
+            </div>
+          )}
 
           {goals && goals.length > 0 && (
             <Card>

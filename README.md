@@ -110,10 +110,11 @@ lib/
 └── utils.ts                               — cn, initials, formatPercent
 
 supabase/
-├── migrations/0001_enums_tables.sql       — full schema
+├── migrations/0001_enums_tables.sql       — full schema (enums, 8 core tables)
 ├── migrations/0002_rls_policies.sql       — role + lock enforcement at DB layer
 ├── migrations/0003_audit_triggers.sql     — generic audit_trigger_fn + handle_new_user
 ├── migrations/0004_views_functions.sql    — compute_score(), helpers, views
+├── migrations/0005_shared_goals.sql       — shared KPI triggers + recipients view
 └── seed.sql                               — 1 admin + 3 managers + 12 employees
 ```
 
@@ -125,6 +126,9 @@ supabase/
 - **Single `useGoalSheetValidation` hook** drives both UI feedback (red borders, weightage bar color, submit-disabled tooltip) and the gating logic, then `goalSheetInputSchema` re-runs on the server.
 - **Manual phase advance in admin UI** is the demo lever. In production this would be a `pg_cron` job that fires on the configured `q2_opens` etc dates — keep this as a talking point for governance reviews.
 - **Scoring duplicated in SQL** (`public.compute_score`) so report views and RPCs can stay aggregated in the database, away from `n*4` round trips.
+- **Shared KPIs via DB triggers** (`0005_shared_goals.sql`) — a manager pushes a goal to multiple employees; each gets a child row locked to the parent's `uom/target/title`. Achievements entered by the parent fan-out to all children via a `SECURITY DEFINER` trigger, and child writes are blocked at trigger depth. Recipients can only adjust their own weightage.
+- **Manager inline edits during review** — `managerUpdateGoals` lets a manager tweak targets/weightage on a submitted sheet without forcing a return loop, with full audit logging.
+- **Stale-session handling in middleware** — `refresh_token_not_found` errors clear `sb-*` cookies on the redirect response and reduce console spam to a single `[auth]` warning line.
 
 ## Deploy
 
@@ -147,5 +151,6 @@ supabase/
 | `npm run typecheck` | `tsc --noEmit`                              |
 | `npm run db:reset`  | `supabase db reset` (re-runs migrations + seed) |
 | `npm run db:push`   | `supabase db push` (apply migrations to remote) |
-#   A t o m Q u e s t - H a c k a t h o n  
+#   A t o m Q u e s t - H a c k a t h o n 
+ 
  

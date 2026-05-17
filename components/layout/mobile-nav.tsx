@@ -22,7 +22,7 @@ import {
   Users2,
   Sparkles,
 } from "lucide-react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Profile, UserRole } from "@/types/database";
@@ -92,10 +92,10 @@ export function MobileNav({ profile }: { profile: Profile }) {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-64 p-0">
-        <div className="flex h-14 items-center gap-2 border-b px-4 text-base font-semibold">
+        <SheetTitle className="flex h-14 items-center gap-2 border-b px-4 text-base font-semibold">
           <Atom className="h-5 w-5 text-primary" />
           AtomQuest
-        </div>
+        </SheetTitle>
         <nav className="space-y-4 overflow-y-auto px-2 pb-4 pt-2">
           {NAV.map((section, idx) => {
             const allowed = section.items.filter(

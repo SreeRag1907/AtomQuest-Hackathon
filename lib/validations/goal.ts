@@ -20,7 +20,8 @@ export const UOM_LABELS: Record<(typeof UOM_TYPES)[number], string> = {
 
 export const goalInputSchema = z
   .object({
-    id: z.string().uuid().optional(),
+    // Client sends `null` for new rows; optional() alone does not accept null
+    id: z.string().uuid().nullish(),
     thrust_area_id: z
       .string()
       .uuid({ message: "Pick a thrust area" })

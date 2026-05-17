@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { History as HistoryIcon } from "lucide-react";
+import Link from "next/link";
+import { History as HistoryIcon, ListPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
@@ -16,7 +17,7 @@ import { CheckinReview } from "./checkin-review";
 import { GoalsReadOnly } from "./goals-read-only";
 import { GoalsManagerEdit } from "./goals-manager-edit";
 import { CheckinReminderButton } from "./checkin-reminder-button";
-import { isCheckinPhase } from "@/lib/cycle";
+import { isCheckinPhase, isGoalSettingPhase } from "@/lib/cycle";
 import type {
   Achievement,
   CheckinComment,
@@ -86,6 +87,9 @@ export default async function TeamMemberPage({
     .from("thrust_areas")
     .select("*");
 
+  const assignGoalsOpen =
+    !!cycle && isGoalSettingPhase(cycle.current_phase);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -94,7 +98,17 @@ export default async function TeamMemberPage({
           employee.manager_id === me.id ? "You" : "—"
         }`}
         actions={
-          sheet ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {assignGoalsOpen &&
+              (!sheet || ["draft", "returned"].includes(sheet.status)) && (
+                <Button asChild size="sm">
+                  <Link href={`/team/${employeeId}/assign-goals`}>
+                    <ListPlus className="h-4 w-4" />
+                    Assign goals
+                  </Link>
+                </Button>
+              )}
+            {sheet ? (
             <div className="flex items-center gap-2">
               {cycle &&
                 isCheckinPhase(cycle.current_phase) &&
@@ -114,7 +128,8 @@ export default async function TeamMemberPage({
                 }
               />
             </div>
-          ) : null
+            ) : null}
+          </div>
         }
       />
 
@@ -137,8 +152,20 @@ export default async function TeamMemberPage({
 
       {!sheet ? (
         <Card>
-          <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            {employee.full_name} hasn't created a goal sheet for this cycle yet.
+          <CardContent className="flex flex-col items-center gap-4 p-8 text-center text-sm text-muted-foreground">
+            <p>
+              {assignGoalsOpen
+                ? `${employee.full_name} has no goal sheet for this cycle yet. You can create one and assign goals, or they can start from My goals.`
+                : `${employee.full_name} hasn't created a goal sheet for this cycle yet.`}
+            </p>
+            {assignGoalsOpen ? (
+              <Button asChild>
+                <Link href={`/team/${employeeId}/assign-goals`}>
+                  <ListPlus className="h-4 w-4" />
+                  Create & assign goals
+                </Link>
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       ) : (
@@ -159,10 +186,24 @@ export default async function TeamMemberPage({
                 thrustAreas={(thrustAreas ?? []) as ThrustArea[]}
               />
             ) : (
-              <GoalsReadOnly
-                goals={(goals ?? []) as Goal[]}
-                thrustAreas={(thrustAreas ?? []) as ThrustArea[]}
-              />
+              <div className="space-y-4">
+                {assignGoalsOpen && (
+                  <div className="rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+                    <span className="font-medium text-foreground">Draft sheet.</span>{" "}
+                    <span className="text-muted-foreground">
+                      Assign or edit goals here, then your team member submits from{" "}
+                      <strong className="text-foreground">My goals</strong>.
+                    </span>{" "}
+                    <Button asChild variant="link" className="h-auto p-0 text-primary">
+                      <Link href={`/team/${employeeId}/assign-goals`}>Open assign page</Link>
+                    </Button>
+                  </div>
+                )}
+                <GoalsReadOnly
+                  goals={(goals ?? []) as Goal[]}
+                  thrustAreas={(thrustAreas ?? []) as ThrustArea[]}
+                />
+              </div>
             )}
           </TabsContent>
 

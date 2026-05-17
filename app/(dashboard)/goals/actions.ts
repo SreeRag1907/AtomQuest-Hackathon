@@ -57,8 +57,10 @@ async function getActiveCycle() {
   return data;
 }
 
-/** Initialize an empty draft goal sheet. Idempotent. */
-export async function createGoalSheet(): Promise<ActionResult<{ id: string }>> {
+/**
+ * Idempotent draft sheet for the signed-in user. Safe for Server Components — does not call revalidatePath.
+ */
+export async function ensureMyDraftGoalSheet(): Promise<ActionResult<{ id: string }>> {
   const auth = await ensureEmployeeProfile();
   if ("error" in auth) return { ok: false, error: auth.error };
 
@@ -86,8 +88,16 @@ export async function createGoalSheet(): Promise<ActionResult<{ id: string }>> {
 
   if (error || !data) return { ok: false, error: error?.message ?? "Failed to create" };
 
-  revalidatePath("/goals");
   return { ok: true, data: { id: data.id } };
+}
+
+/** Initialize an empty draft goal sheet. Idempotent. Call from client triggers (e.g. Server Action), not during RSC render. */
+export async function createGoalSheet(): Promise<ActionResult<{ id: string }>> {
+  const result = await ensureMyDraftGoalSheet();
+  if (result.ok) {
+    revalidatePath("/goals");
+  }
+  return result;
 }
 
 /**
@@ -209,7 +219,8 @@ export async function submitForApproval(
   return { ok: true };
 }
 
-async function replaceGoals(
+/** Persist goal rows for a sheet (used by employee drafts and manager assign flow). */
+export async function replaceGoals(
   sheetId: string,
   goals: GoalDraftInput[]
 ): Promise<ActionResult> {

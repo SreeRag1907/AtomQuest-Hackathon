@@ -6,7 +6,7 @@ import { isGoalSettingPhase, phaseLabel } from "@/lib/cycle";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { GoalSheetForm } from "@/components/goals/goal-sheet-form";
-import { createGoalSheet } from "@/app/(dashboard)/goals/actions";
+import { ensureMyDraftGoalSheet } from "@/app/(dashboard)/goals/actions";
 import type { Cycle, Goal, GoalSheet, ThrustArea } from "@/types/database";
 
 export default async function NewGoalSheetPage() {
@@ -55,7 +55,7 @@ export default async function NewGoalSheetPage() {
   let returnReason: string | null = null;
 
   if (!sheetId) {
-    const result = await createGoalSheet();
+    const result = await ensureMyDraftGoalSheet();
     if (!result.ok || !result.data) {
       return (
         <EmptyState

@@ -19,6 +19,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { saveDraft, submitForApproval } from "@/app/(dashboard)/goals/actions";
+import type { GoalDraftInput } from "@/app/(dashboard)/goals/actions";
 import { useGoalSheetValidation } from "@/hooks/use-goal-sheet-validation";
 import type { Goal, ThrustArea, UomType } from "@/types/database";
 import { GoalCard } from "./goal-card";
@@ -49,6 +50,15 @@ interface Props {
   shareCandidates?: ShareRecipient[];
   recipientsByGoalId?: Record<string, string[]>;
   parentOwnerByGoalId?: Record<string, string>;
+  /** When set, replaces default employee `saveDraft` (e.g. manager assigning to a report). */
+  saveDraftAction?: (
+    sheetId: string,
+    goals: GoalDraftInput[]
+  ) => Promise<{ ok: boolean; error?: string }>;
+  /** Hide submit — e.g. manager assigns draft; employee submits from My goals. */
+  hideSubmit?: boolean;
+  /** Shown under the weightage bar when `hideSubmit` is true */
+  assignHint?: string;
 }
 
 const MAX_GOALS = 8;
@@ -94,6 +104,9 @@ export function GoalSheetForm({
   shareCandidates,
   recipientsByGoalId,
   parentOwnerByGoalId,
+  saveDraftAction,
+  hideSubmit = false,
+  assignHint,
 }: Props) {
   const router = useRouter();
   const [goals, setGoals] = useState<GoalRow[]>(() =>
@@ -124,7 +137,7 @@ export function GoalSheetForm({
     setGoals((prev) => [...prev, newRow()]);
   }
 
-  function payload() {
+  function payload(): GoalDraftInput[] {
     return goals.map((g) => ({
       id: g.id ?? null,
       thrust_area_id: g.thrust_area_id,
@@ -134,12 +147,14 @@ export function GoalSheetForm({
       target: g.target,
       target_date: g.target_date,
       weightage: g.weightage,
+      parent_goal_id: g.parent_goal_id ?? null,
     }));
   }
 
   function handleSaveDraft() {
     startSaving(async () => {
-      const result = await saveDraft(sheetId, payload());
+      const save = saveDraftAction ?? saveDraft;
+      const result = await save(sheetId, payload());
       if (!result.ok) {
         toast.error(result.error ?? "Failed to save");
         return;
@@ -179,6 +194,12 @@ export function GoalSheetForm({
           <p className="mt-1 text-sm text-foreground">{returnReason}</p>
         </div>
       )}
+
+      {assignHint && hideSubmit ? (
+        <p className="mb-4 rounded-md border border-muted-foreground/20 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          {assignHint}
+        </p>
+      ) : null}
 
       <WeightageBar
         total={validation.totalWeightage}
@@ -229,9 +250,13 @@ export function GoalSheetForm({
       <div className="sticky bottom-0 -mx-6 mt-8 border-t bg-background/95 px-6 py-3 backdrop-blur">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-xs text-muted-foreground">
-            {validation.errors.length === 0
-              ? "Looks good. Submit when you're ready."
-              : `${validation.errors.length} issue${validation.errors.length === 1 ? "" : "s"} to resolve`}
+            {hideSubmit
+              ? validation.errors.length === 0
+                ? "Save when done. Your team member submits from My goals."
+                : `${validation.errors.length} issue${validation.errors.length === 1 ? "" : "s"} to resolve`
+              : validation.errors.length === 0
+                ? "Looks good. Submit when you're ready."
+                : `${validation.errors.length} issue${validation.errors.length === 1 ? "" : "s"} to resolve`}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -247,7 +272,7 @@ export function GoalSheetForm({
               )}
               Save draft
             </Button>
-            {submitDisabledReason ? (
+            {hideSubmit ? null : submitDisabledReason ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span tabIndex={0}>

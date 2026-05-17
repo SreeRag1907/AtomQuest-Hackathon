@@ -2,11 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { replaceGoals, type GoalDraftInput } from "@/app/(dashboard)/goals/actions";
+import { isGoalSettingPhase } from "@/lib/cycle";
 import { sendEmail } from "@/lib/email";
 import { goalApprovedEmail, goalReturnedEmail } from "@/lib/email/templates";
 import { sendTeamsCard } from "@/lib/teams";
 import { goalApprovedCard, goalReturnedCard } from "@/lib/teams/templates";
-import type { GoalSheet, Profile } from "@/types/database";
+import type { Cycle, GoalSheet, Profile } from "@/types/database";
 
 interface Result {
   ok: boolean;
@@ -29,6 +31,16 @@ async function authManager() {
   return { me };
 }
 
+async function getActiveCycle() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("cycles")
+    .select("*")
+    .eq("is_active", true)
+    .single<Cycle>();
+  return data;
+}
+
 async function ensureTeamMember(managerId: string, employeeId: string) {
   const supabase = await createClient();
   const { data: emp } = await supabase
@@ -38,6 +50,95 @@ async function ensureTeamMember(managerId: string, employeeId: string) {
     .single<Pick<Profile, "id" | "manager_id">>();
   if (!emp) return false;
   return emp.manager_id === managerId;
+}
+
+/**
+ * Create a draft goal sheet for a direct report during goal-setting (or return existing).
+ * Uses manager RLS; employees can still submit from My goals after the manager saves drafts.
+ */
+export async function managerCreateGoalSheetForEmployee(
+  employeeId: string
+): Promise<Result & { sheetId?: string }> {
+  const auth = await authManager();
+  if ("error" in auth) return { ok: false, error: auth.error };
+  if (auth.me.role !== "admin" && !(await ensureTeamMember(auth.me.id, employeeId))) {
+    return { ok: false, error: "Not authorized" };
+  }
+
+  const cycle = await getActiveCycle();
+  if (!cycle) return { ok: false, error: "No active cycle" };
+  if (!isGoalSettingPhase(cycle.current_phase)) {
+    return { ok: false, error: "Goal-setting window is closed for this cycle." };
+  }
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("goal_sheets")
+    .select("id, status")
+    .eq("employee_id", employeeId)
+    .eq("cycle_id", cycle.id)
+    .maybeSingle<{ id: string; status: string }>();
+
+  if (existing?.id) {
+    if (!["draft", "returned"].includes(existing.status)) {
+      return {
+        ok: false,
+        error: "This person already has a goal sheet for this cycle (not in draft).",
+      };
+    }
+    return { ok: true, sheetId: existing.id };
+  }
+
+  const { data, error } = await supabase
+    .from("goal_sheets")
+    .insert({ employee_id: employeeId, cycle_id: cycle.id, status: "draft" })
+    .select("id")
+    .single();
+
+  if (error || !data) return { ok: false, error: error?.message ?? "Failed to create sheet" };
+
+  return { ok: true, sheetId: data.id };
+}
+
+/** Save draft goals on a direct report's sheet (goal-setting phase, draft/returned only). */
+export async function managerSaveEmployeeDraft(
+  sheetId: string,
+  goals: GoalDraftInput[]
+): Promise<Result> {
+  const auth = await authManager();
+  if ("error" in auth) return { ok: false, error: auth.error };
+  const supabase = await createClient();
+
+  const { data: sheet } = await supabase
+    .from("goal_sheets")
+    .select("*")
+    .eq("id", sheetId)
+    .single<GoalSheet>();
+  if (!sheet) return { ok: false, error: "Sheet not found" };
+  if (
+    auth.me.role !== "admin" &&
+    !(await ensureTeamMember(auth.me.id, sheet.employee_id))
+  ) {
+    return { ok: false, error: "Not authorized" };
+  }
+  if (!["draft", "returned"].includes(sheet.status)) {
+    return { ok: false, error: "You can only assign goals while the sheet is draft or returned." };
+  }
+
+  const nonChildGoals = goals.filter((g) => !g.parent_goal_id);
+  if (nonChildGoals.length > 8) {
+    return { ok: false, error: "Maximum 8 goals per sheet" };
+  }
+
+  const persisted = await replaceGoals(sheetId, goals);
+  if (!persisted.ok) return { ok: false, error: persisted.error ?? "Failed to save" };
+
+  revalidatePath("/team");
+  revalidatePath(`/team/${sheet.employee_id}`);
+  revalidatePath(`/team/${sheet.employee_id}/assign-goals`);
+  revalidatePath(`/goals/${sheetId}`);
+  revalidatePath("/goals");
+  return { ok: true };
 }
 
 export async function approveGoalSheet(sheetId: string): Promise<Result> {

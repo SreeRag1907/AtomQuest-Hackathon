@@ -16,21 +16,23 @@ declare
   v_after jsonb;
   v_id uuid;
 begin
-  if (tg_op = 'INSERT') then
+  if (TG_OP = 'INSERT') then
     v_action := 'created';
     v_before := null;
     v_after := to_jsonb(new);
     v_id := new.id;
-  elsif (tg_op = 'UPDATE') then
+  elsif (TG_OP = 'UPDATE') then
     v_action := 'updated';
     v_before := to_jsonb(old);
     v_after := to_jsonb(new);
     v_id := new.id;
-    -- detect status transitions for cleaner audit semantics
-    if tg_table_name = 'goal_sheets' and old.status is distinct from new.status then
-      v_action := 'status_' || new.status::text;
+    -- Only goal_sheets has status; use TG_TABLE_NAME + jsonb so goals/achievements never touch old.status
+    if TG_TABLE_NAME = 'goal_sheets' then
+      if (to_jsonb(old) ->> 'status') is distinct from (to_jsonb(new) ->> 'status') then
+        v_action := 'status_' || (new).status::text;
+      end if;
     end if;
-  elsif (tg_op = 'DELETE') then
+  elsif (TG_OP = 'DELETE') then
     v_action := 'deleted';
     v_before := to_jsonb(old);
     v_after := null;
@@ -38,7 +40,7 @@ begin
   end if;
 
   insert into audit_log (entity_type, entity_id, action, changed_by, before_value, after_value)
-  values (tg_table_name, v_id, v_action, auth.uid(), v_before, v_after);
+  values (TG_TABLE_NAME, v_id, v_action, auth.uid(), v_before, v_after);
 
   return coalesce(new, old);
 end;

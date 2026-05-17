@@ -284,7 +284,7 @@ export function AchievementReport({
           <TableBody>
             {rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8 + QUARTERS.length} className="py-8 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={6 + QUARTERS.length + 1} className="py-8 text-center text-sm text-muted-foreground">
                   No goals match the selected filters.
                 </TableCell>
               </TableRow>

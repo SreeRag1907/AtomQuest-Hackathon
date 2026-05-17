@@ -70,7 +70,8 @@ export default async function ApprovalsQueuePage() {
           description="Your team has no pending approvals right now."
         />
       ) : (
-        <Card>
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -120,6 +121,7 @@ export default async function ApprovalsQueuePage() {
               })}
             </TableBody>
           </Table>
+          </div>
         </Card>
       )}
     </div>

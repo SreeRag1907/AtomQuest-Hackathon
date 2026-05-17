@@ -74,7 +74,7 @@ export async function AdminDashboard({ profile }: { profile: Profile }) {
                 <div className="text-sm">{cycle.name}</div>
                 <Badge variant="default">{phaseLabel(cycle.current_phase)}</Badge>
                 <p className="text-xs text-muted-foreground">
-                  Use the cycles page to manually advance phases for the demo.
+                  Advance the cycle phase from the Cycles settings page.
                 </p>
               </>
             ) : (

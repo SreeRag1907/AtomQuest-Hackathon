@@ -179,14 +179,24 @@ export default async function GoalsListPage() {
           )}
 
           {goals && goals.length === 0 && (
-            <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
-              No goals on this sheet yet.{" "}
-              {["draft", "returned"].includes(sheet.status) && (
-                <Link href={`/goals/${sheet.id}`} className="text-primary hover:underline">
-                  Start adding goals →
-                </Link>
-              )}
-            </div>
+            <EmptyState
+              icon={ClipboardList}
+              title="No goals on this sheet yet"
+              description={
+                ["draft", "returned"].includes(sheet.status)
+                  ? "Add up to 8 goals with a total weightage of 100%."
+                  : "No goals were recorded for this sheet."
+              }
+              action={
+                ["draft", "returned"].includes(sheet.status) ? (
+                  <Button asChild size="sm">
+                    <Link href={`/goals/${sheet.id}`}>
+                      <Plus className="h-4 w-4" /> Add goals
+                    </Link>
+                  </Button>
+                ) : undefined
+              }
+            />
           )}
 
           {goals && goals.length > 0 && (

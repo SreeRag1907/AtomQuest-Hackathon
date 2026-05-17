@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, ClipboardList, Loader2, TrendingUp } from "lucide-react";
+import { Activity, ArrowRight, CheckCircle2, ClipboardList, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ export async function EmployeeDashboard({ profile }: { profile: Profile }) {
     .from("cycles")
     .select("*")
     .eq("is_active", true)
-    .single<Cycle>();
+    .maybeSingle<Cycle>();
 
   const { data: sheet } = cycle
     ? await supabase
@@ -73,7 +73,7 @@ export async function EmployeeDashboard({ profile }: { profile: Profile }) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total goals" value={stats.total} icon={ClipboardList} />
         <StatCard label="Approved" value={stats.approved} icon={CheckCircle2} accent="success" />
-        <StatCard label="On track" value={stats.inProgress} icon={Loader2} accent="warning" />
+        <StatCard label="On track" value={stats.inProgress} icon={Activity} accent="success" />
         <StatCard label="Completed" value={stats.completed} icon={TrendingUp} accent="primary" />
       </div>
 

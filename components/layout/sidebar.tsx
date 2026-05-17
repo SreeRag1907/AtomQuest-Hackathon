@@ -125,7 +125,7 @@ export function Sidebar({ profile }: SidebarProps) {
           return (
             <div key={idx}>
               {!collapsed && section.title && (
-                <div className="px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                <div className="px-2 pb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   {section.title}
                 </div>
               )}
@@ -190,7 +190,7 @@ export function Sidebar({ profile }: SidebarProps) {
         {!collapsed && (
           <div className="mt-2 flex items-center gap-1 px-2.5 text-[10px] text-muted-foreground">
             <ShieldCheck className="h-3 w-3" />
-            RLS-enforced
+            Role-secured
           </div>
         )}
       </div>

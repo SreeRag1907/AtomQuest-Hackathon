@@ -70,7 +70,7 @@ export default async function EscalationPage() {
     <div className="space-y-6">
       <PageHeader
         title="Escalation"
-        description="Configure SLA rules and review fired escalations. Run on demand or wire to a cron later."
+        description="Configure SLA thresholds and review fired escalations. Run checks manually or schedule them via your CI/CD pipeline."
         actions={
           <div className="flex items-center gap-2">
             <RunCheckButton />

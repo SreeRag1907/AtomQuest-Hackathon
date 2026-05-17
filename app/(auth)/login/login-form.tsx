@@ -74,7 +74,16 @@ export function LoginForm() {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({ email: e, password: p });
       if (error) {
-        toast.error(error.message);
+        const code = error.message?.toLowerCase() ?? "";
+        const friendly =
+          code.includes("invalid login") || code.includes("invalid credentials") || code.includes("email not confirmed")
+            ? "Incorrect email or password. Please try again."
+            : code.includes("too many requests") || code.includes("rate limit")
+              ? "Too many attempts. Please wait a moment and try again."
+              : code.includes("network") || code.includes("fetch")
+                ? "Network error. Check your connection and retry."
+                : "Sign-in failed. Please try again.";
+        toast.error(friendly);
         return;
       }
       const rawFrom = searchParams.get("from") ?? "";

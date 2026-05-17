@@ -91,8 +91,11 @@ export async function ManagerDashboard({ profile }: { profile: Profile }) {
             )}
           </CardHeader>
           <CardContent className="space-y-2">
-            {pending === 0 && approvedCount === team?.length && (
-              <p className="text-sm text-muted-foreground">All clear — no pending approvals.</p>
+            {pending === 0 && (team?.length ?? 0) > 0 && (
+              <p className="text-sm text-muted-foreground">No pending submissions — all caught up.</p>
+            )}
+            {(team?.length ?? 0) === 0 && (
+              <p className="text-sm text-muted-foreground">No direct reports assigned yet.</p>
             )}
             {(sheets ?? [])
               .filter((s) => s.status === "submitted")

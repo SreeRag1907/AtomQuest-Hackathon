@@ -290,7 +290,7 @@ export function CheckinForm({
       <div className="sticky bottom-0 -mx-6 mt-6 border-t bg-background/95 px-6 py-3 backdrop-blur">
         <div className="flex items-center justify-between">
           <div className="text-xs text-muted-foreground">
-            All goals save together. Auto-recompute happens server-side.
+            All goals save together. Scores update automatically after saving.
           </div>
           <Button onClick={save} disabled={isPending}>
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

@@ -15,6 +15,8 @@ import { ApprovalActions } from "./approval-actions";
 import { CheckinReview } from "./checkin-review";
 import { GoalsReadOnly } from "./goals-read-only";
 import { GoalsManagerEdit } from "./goals-manager-edit";
+import { CheckinReminderButton } from "./checkin-reminder-button";
+import { isCheckinPhase } from "@/lib/cycle";
 import type {
   Achievement,
   CheckinComment,
@@ -93,15 +95,25 @@ export default async function TeamMemberPage({
         }`}
         actions={
           sheet ? (
-            <AuditDrawer
-              entityType={["goal_sheets", "goals", "achievements"]}
-              entityIds={[sheet.id, ...(goals ?? []).map((g) => g.id)]}
-              trigger={
-                <Button variant="outline" size="sm">
-                  <HistoryIcon className="h-4 w-4" /> Audit history
-                </Button>
-              }
-            />
+            <div className="flex items-center gap-2">
+              {cycle &&
+                isCheckinPhase(cycle.current_phase) &&
+                ["approved", "locked"].includes(sheet.status) && (
+                  <CheckinReminderButton
+                    employeeId={employee.id}
+                    employeeName={employee.full_name}
+                  />
+                )}
+              <AuditDrawer
+                entityType={["goal_sheets", "goals", "achievements"]}
+                entityIds={[sheet.id, ...(goals ?? []).map((g) => g.id)]}
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <HistoryIcon className="h-4 w-4" /> Audit history
+                  </Button>
+                }
+              />
+            </div>
           ) : null
         }
       />

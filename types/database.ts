@@ -144,3 +144,33 @@ export interface UnlockRequest {
   reviewed_at: string | null;
   created_at: string;
 }
+
+export type EscalationTriggerEvent =
+  | "goals_not_submitted"
+  | "goals_not_approved"
+  | "checkin_not_done";
+
+export interface EscalationRule {
+  id: string;
+  name: string;
+  trigger_event: EscalationTriggerEvent;
+  threshold_days: number;
+  notify_employee: boolean;
+  notify_manager: boolean;
+  notify_hr: boolean;
+  is_active: boolean;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+}
+
+export interface EscalationLogRow {
+  id: string;
+  rule_id: string | null;
+  employee_id: string;
+  trigger_event: EscalationTriggerEvent;
+  fired_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  notes: string | null;
+}

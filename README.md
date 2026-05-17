@@ -12,6 +12,9 @@ Enterprise goal-setting and performance tracking — built end to end on **Next.
 - **Audit trail** captured by **Postgres triggers** on `goal_sheets`, `goals`, and `achievements` — application code can never forget to log
 - **Reports**: achievement (filterable + CSV export) and completion (charts + drill-down)
 - **Analytics**: KPI cards, QoQ trends, donut + bar + stacked distributions, department × quarter heatmap, manager effectiveness, employee drill-down
+- **Escalation engine**: configurable SLA rules (goals not submitted / not approved / check-in pending) with manual `Run check now` and per-rule notify toggles for employee / manager / HR
+- **Microsoft Teams Adaptive Cards** posted alongside emails for goal submitted, approved, returned, and escalation events (graceful no-op without `TEAMS_WEBHOOK_URL`)
+- **Microsoft Entra (Azure AD) SSO** ready out of the box — group→role mapping is env-driven so you can wire it without redeploying
 - **Stretch bonuses**: Resend email templates (gracefully no-ops without `RESEND_API_KEY`) and a `⌘K` / `Ctrl+K` command palette
 
 ## Tech stack
@@ -115,6 +118,7 @@ supabase/
 ├── migrations/0003_audit_triggers.sql     — generic audit_trigger_fn + handle_new_user
 ├── migrations/0004_views_functions.sql    — compute_score(), helpers, views
 ├── migrations/0005_shared_goals.sql       — shared KPI triggers + recipients view
+├── migrations/0006_escalation.sql         — escalation_rules + escalation_log + RLS
 └── seed.sql                               — 1 admin + 3 managers + 12 employees
 ```
 
@@ -129,13 +133,34 @@ supabase/
 - **Shared KPIs via DB triggers** (`0005_shared_goals.sql`) — a manager pushes a goal to multiple employees; each gets a child row locked to the parent's `uom/target/title`. Achievements entered by the parent fan-out to all children via a `SECURITY DEFINER` trigger, and child writes are blocked at trigger depth. Recipients can only adjust their own weightage.
 - **Manager inline edits during review** — `managerUpdateGoals` lets a manager tweak targets/weightage on a submitted sheet without forcing a return loop, with full audit logging.
 - **Stale-session handling in middleware** — `refresh_token_not_found` errors clear `sb-*` cookies on the redirect response and reduce console spam to a single `[auth]` warning line.
+- **Rule-driven escalation engine** (`0006_escalation.sql`) — admin-managed `escalation_rules` are evaluated on demand by `runEscalationCheck`, deduped via a unique partial index `(rule_id, employee_id, fired_at::date) where resolved_at is null`. Each fire emits in-app notifications, an email (Resend), and a Teams Adaptive Card (webhook).
+- **Teams Adaptive Cards** are sent in parallel with email — `lib/teams/index.ts` is a thin wrapper over `TEAMS_WEBHOOK_URL`. If the env var is missing every call is a no-op so local dev / judge environments never see a 401.
+- **Entra group→role mapping is env-driven** (`AZURE_GROUP_ADMIN/MANAGER/EMPLOYEE`) so the role policy can be retuned in production without code changes; `app/auth/callback/route.ts` upserts the profile on every OAuth sign-in via `lib/auth/entra-sync.ts`.
+
+## Microsoft Entra (Azure AD) SSO setup
+
+The Microsoft sign-in button on `/login` is wired to the standard Supabase OAuth PKCE flow. No app code changes are needed once Supabase is configured — the work is on the Supabase + Entra side.
+
+1. **Azure portal** → App registrations → **New registration**.
+   * Redirect URI: `https://<your-supabase-ref>.supabase.co/auth/v1/callback`
+   * Front-channel logout: `https://your-app/login`
+2. **Certificates & secrets** → New client secret → copy the **Value**.
+3. **Token configuration** → Add optional claim → `groups` (Group ID) for ID + Access tokens. This is what powers role mapping.
+4. **API permissions** → Microsoft Graph → `User.Read`, `email`, `openid`, `profile`, `offline_access`. Grant admin consent.
+5. **Supabase Dashboard** → Authentication → Providers → **Azure** → enable, paste the Application (client) ID, Directory (tenant) ID, and Client Secret.
+6. Create three Entra groups (e.g. `AtomQuest-Admin`, `AtomQuest-Manager`, `AtomQuest-Employee`) and copy their Object IDs into `AZURE_GROUP_ADMIN`, `AZURE_GROUP_MANAGER`, `AZURE_GROUP_EMPLOYEE` in `.env.local`.
+7. Add target users to the right groups; sign in via Microsoft on `/login` and the profile row is created/updated with the correct role automatically.
+
+If `AZURE_GROUP_*` env vars are blank, sign-ins still succeed but new users default to the `employee` role — admins can re-assign from `/admin/users`.
 
 ## Deploy
 
 ```bash
 # Push to GitHub then import on Vercel
 # Set env vars on Vercel: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
-# SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SITE_URL, (optional) RESEND_API_KEY.
+# SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SITE_URL,
+# (optional) RESEND_API_KEY, TEAMS_WEBHOOK_URL,
+# (optional) AZURE_GROUP_ADMIN/MANAGER/EMPLOYEE.
 # Build command: npm run build
 # Output:        .next
 ```

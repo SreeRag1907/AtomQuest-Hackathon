@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email";
 import { goalApprovedEmail, goalReturnedEmail } from "@/lib/email/templates";
+import { sendTeamsCard } from "@/lib/teams";
+import { goalApprovedCard, goalReturnedCard } from "@/lib/teams/templates";
 import type { GoalSheet, Profile } from "@/types/database";
 
 interface Result {
@@ -92,6 +94,9 @@ export async function approveGoalSheet(sheetId: string): Promise<Result> {
     const link = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/goals/${sheetId}`;
     const tpl = goalApprovedEmail({ employeeName: emp.full_name, link });
     await sendEmail({ to: emp.email, subject: tpl.subject, html: tpl.html });
+    await sendTeamsCard(
+      goalApprovedCard({ employeeName: emp.full_name, link })
+    );
   }
 
   revalidatePath("/team");
@@ -154,6 +159,13 @@ export async function returnGoalSheet(sheetId: string, reason: string): Promise<
       link,
     });
     await sendEmail({ to: emp.email, subject: tpl.subject, html: tpl.html });
+    await sendTeamsCard(
+      goalReturnedCard({
+        employeeName: emp.full_name,
+        reason: reason.trim(),
+        link,
+      })
+    );
   }
 
   revalidatePath("/team");

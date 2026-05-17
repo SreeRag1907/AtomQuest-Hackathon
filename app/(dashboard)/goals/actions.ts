@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { goalSheetInputSchema } from "@/lib/validations/goal";
 import { sendEmail } from "@/lib/email";
 import { goalSubmittedEmail } from "@/lib/email/templates";
+import { sendTeamsCard } from "@/lib/teams";
+import { goalSubmittedCard } from "@/lib/teams/templates";
 
 export interface GoalDraftInput {
   id?: string | null;
@@ -186,6 +188,13 @@ export async function submitForApproval(
         link,
       });
       await sendEmail({ to: manager.email, subject: tpl.subject, html: tpl.html });
+      await sendTeamsCard(
+        goalSubmittedCard({
+          employeeName: auth.profile.full_name,
+          managerName: manager.full_name,
+          link,
+        })
+      );
     }
   }
 

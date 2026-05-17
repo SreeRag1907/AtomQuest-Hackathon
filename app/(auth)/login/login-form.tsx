@@ -63,6 +63,20 @@ export function LoginForm() {
     });
   }
 
+  function signInWithMicrosoft() {
+    startTransition(async () => {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "azure",
+        options: {
+          scopes: "email openid profile offline_access",
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) toast.error(error.message);
+    });
+  }
+
   // A `from` param means middleware redirected the user here — either their
   // session expired or they tried to access a protected route while signed out.
   const redirectedFrom = searchParams.get("from");
@@ -133,11 +147,12 @@ export function LoginForm() {
         <Button
           type="button"
           variant="outline"
-          className="w-full"
-          disabled
-          title="Connect Azure provider in Supabase to enable"
+          className="w-full gap-2"
+          disabled={isPending}
+          onClick={signInWithMicrosoft}
         >
-          Sign in with Microsoft (coming soon)
+          <MicrosoftLogo className="h-4 w-4" />
+          Sign in with Microsoft
         </Button>
       </form>
 
@@ -178,5 +193,16 @@ export function LoginForm() {
         </div>
       </Card>
     </div>
+  );
+}
+
+function MicrosoftLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 23 23" className={className} aria-hidden="true">
+      <rect x="1" y="1" width="10" height="10" fill="#f25022" />
+      <rect x="12" y="1" width="10" height="10" fill="#7fba00" />
+      <rect x="1" y="12" width="10" height="10" fill="#00a4ef" />
+      <rect x="12" y="12" width="10" height="10" fill="#ffb900" />
+    </svg>
   );
 }

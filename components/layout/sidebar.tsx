@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  AlertTriangle,
   Atom,
   BarChart3,
   CheckSquare,
@@ -76,6 +77,7 @@ const NAV: NavSection[] = [
       { href: "/admin/thrust-areas", label: "Thrust areas", icon: Tag, roles: ["admin"] },
       { href: "/admin/audit-log", label: "Audit log", icon: ScrollText, roles: ["admin"] },
       { href: "/admin/unlock-requests", label: "Unlock requests", icon: Unlock, roles: ["admin"] },
+      { href: "/admin/escalation", label: "Escalation", icon: AlertTriangle, roles: ["admin"] },
     ],
   },
   {

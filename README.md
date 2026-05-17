@@ -1,203 +1,123 @@
-# AtomQuest Portal
+# AtomQuest
 
-Enterprise goal-setting and performance tracking — built end to end on **Next.js 15 (App Router)** + **Supabase** with audit-grade governance baked into the database layer.
+Enterprise goal-setting and performance portal built with **Next.js 15** (App Router) and **Supabase** (PostgreSQL, Auth, RLS). Goals, approvals, check-ins, and audit history are enforced at the database layer.
 
-## Highlights
+## Features
 
-- **Role-based** workflows (Employee / Manager / Admin) with **RLS-enforced** access at the database level
-- **Goal sheets** with up to 8 goals, weightages totaling 100%, mixed UoM types, and a sticky validation bar that gates submission live
-- **Phase-gated cycle**: goal-setting → Q1 → Q2 → Q3 → Q4/annual → closed (admin can advance manually for demos)
-- **Quarterly check-ins** with a centralized scoring engine shared between client UI and Postgres functions
-- **Manager review** with approve / return-with-reason actions and lock semantics enforced via RLS
-- **Audit trail** captured by **Postgres triggers** on `goal_sheets`, `goals`, and `achievements` — application code can never forget to log
-- **Reports**: achievement (filterable + CSV export) and completion (charts + drill-down)
-- **Analytics**: KPI cards, QoQ trends, donut + bar + stacked distributions, department × quarter heatmap, manager effectiveness, employee drill-down
-- **Escalation engine**: configurable SLA rules (goals not submitted / not approved / check-in pending) with manual `Run check now` and per-rule notify toggles for employee / manager / HR
-- **Microsoft Teams Adaptive Cards** (bonus): wired to **`TEAMS_WEBHOOK_URL`** — code posts cards next to emails; **this hackathon submission does not configure a webhook** (org Teams incoming webhooks aren’t available on consumer / Communities-only clients)
-- **Microsoft Entra SSO** (bonus): **`/login` + `/auth/callback`** PKCE sync; **`AZURE_GROUP_*` role mapping requires Entra groups with members + optional `groups` claim** — **not populated in our demo tenant**, so judges should use **seeded email/password roles** (`@atomquest.demo`); SSO remains optional infra
-- **Stretch bonuses**: Resend email templates (optional `RESEND_API_KEY`; verify a sender domain at Resend) and a `⌘K` / `Ctrl+K` command palette
+- **Roles**: Employee, Manager, and Admin with row-level security on sensitive data
+- **Cycles**: Phases from goal-setting through quarters to close; admins control phase and active cycle
+- **Goal sheets**: Up to eight goals per cycle, weightings totaling 100%, multiple units of measure, validation on draft and submit
+- **Manager workflow**: Review queue, approve/return with reason, inline edits on submitted sheets, **assign goals** for direct reports during goal-setting (`/team/[employeeId]/assign-goals`); employees submit for approval from **My goals**
+- **Check-ins**: Quarterly actuals with shared scoring logic in the app and SQL
+- **Reports & analytics**: Achievement and completion reports; analytics dashboards (**org-wide for admins**, **team-scoped for managers**, **self-scoped for employees**)
+- **Governance**: Audit logging via database triggers, unlock requests, configurable escalation rules
+- **Optional**: Resend email, Microsoft Teams webhooks (adaptive cards), Microsoft Entra sign-in via Supabase (with optional group → role mapping)
 
 ## Tech stack
 
-- **Framework**: Next.js 15 (App Router, RSC, Server Actions)
-- **Backend**: Supabase (Postgres, RLS, Auth, Realtime)
-- **Validation**: zod + react-hook-form patterns
-- **UI**: TailwindCSS + custom shadcn/ui primitives + lucide-react
-- **Charts**: Recharts
-- **Tables**: TanStack Table-ready via shadcn `Table` primitive
-- **Toasts**: sonner
-- **Email** (optional): Resend
+| Area | Choice |
+|------|--------|
+| App | Next.js 15, React 18, TypeScript, Server Actions |
+| UI | Tailwind CSS, shadcn/ui, Lucide |
+| Data | Supabase Postgres, `@supabase/ssr`, RLS policies |
+| Validation | Zod |
+| Charts | Recharts |
 
 ## Prerequisites
 
-- Node 18.18+ and pnpm or npm
-- A Supabase project (cloud or local via Supabase CLI)
+- **Node.js** 18.18+ / 20+
+- **npm**, pnpm, or yarn
+- A **Supabase** project (cloud or local via [Supabase CLI](https://supabase.com/docs/guides/cli))
 
-## Setup
+## Getting started
 
 ```bash
-# 1. Install dependencies
-npm install        # or: pnpm install / yarn install
-
-# 2. Copy env template and fill in your Supabase project credentials
+npm install
 cp .env.local.example .env.local
-# Then edit .env.local and set:
-#   NEXT_PUBLIC_SUPABASE_URL
-#   NEXT_PUBLIC_SUPABASE_ANON_KEY
-#   SUPABASE_SERVICE_ROLE_KEY
-#   NEXT_PUBLIC_SITE_URL=http://localhost:3000
-#   (optional) RESEND_API_KEY, RESEND_FROM_EMAIL
+# Edit .env.local: Supabase URL, anon key, service role key, NEXT_PUBLIC_SITE_URL
 
-# 3. Apply database migrations + seed
-#    Option A: Supabase CLI (cloud project)
-supabase link --project-ref <your-ref>
-supabase db push                        # applies supabase/migrations/*.sql
-psql "$SUPABASE_DB_URL" -f supabase/seed.sql
+# Apply schema (cloud: link project first; local: supabase start)
+supabase db push
+# Or reset local DB including seed:
+npm run db:reset
 
-#    Option B: Local Supabase
-supabase start
-supabase db reset                       # runs migrations + seed.sql automatically
-
-# 4. Start the dev server
 npm run dev
-# → http://localhost:3000
 ```
 
-## Demo credentials
+Open [http://localhost:3000](http://localhost:3000).
 
-> Password for **all** seeded accounts: `Atomquest!2026`
+## Environment variables
 
-| Role     | Email                          | Notes                                      |
-|----------|--------------------------------|--------------------------------------------|
-| Admin    | `admin@atomquest.demo`         | Cycle controls, audit log, all reports     |
-| Manager  | `maya.patel@atomquest.demo`    | Engineering — has approvals to review      |
-| Manager  | `rohan.verma@atomquest.demo`   | Sales                                      |
-| Manager  | `sara.chen@atomquest.demo`     | Customer Success                           |
-| Employee | `priya.iyer@atomquest.demo`    | Locked sheet, full Q1 actuals              |
-| Employee | `arjun.rao@atomquest.demo`     | Submitted, pending Maya's review           |
-| Employee | `devika.shah@atomquest.demo`   | Returned (low weightage on goal #2)        |
+Copy **`.env.local.example`** to `.env.local`. Required values:
 
-The login screen has demo-cred quick-fill cards — one click signs you in.
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role (admin invites, server-only operations) |
+| `NEXT_PUBLIC_SITE_URL` | Canonical app URL (auth redirect links) |
 
-### Hackathon submission: Teams + Azure AD (what’s wired vs skipped)
+Optional: `RESEND_*`, `TEAMS_WEBHOOK_URL`, Azure group IDs for SSO role mapping — see comments in `.env.local.example`.
 
-BRD Phase 1/2 demos use **nothing below** — they’re Section 5 “good-to-have” only:
+For **local development** when Supabase auth email rate limits block invites or sign-up, you can set `AUTH_DEV_CREATE_USER_WITHOUT_EMAIL=true` (see example file). **Do not enable in production.**
 
-| Integration | Repo status | Submitted hackathon demo |
-|-------------|-------------|---------------------------|
-| **Teams** | `sendTeamsCard` + Adaptive templates in `lib/teams/` — **noop** without `TEAMS_WEBHOOK_URL` | **Not configured.** No Incoming Webhook URL (typical blocker: Communities-only Teams or org policy).
-| **Entra groups → role** | `AZURE_GROUP_ADMIN/MANAGER/EMPLOYEE` + `/auth/callback` sync (`lib/auth/entra-sync.ts`) | **`AZURE_GROUP_*` IDs may set; Azure groups aren’t populated with demo members** → role-from-groups inactive; SSO users default to **`employee`** until `/admin/users` or future IAM rollout.
-| **Microsoft sign-in** | Enable Azure provider in Supabase + redirect URI per README | Optional; credentials for judges remain **three seeded accounts**.
+## Database
 
-**Evaluators:** All role journeys are proven with **`admin@atomquest.demo`, `maya.patel@atomquest.demo`, seeded employees**, password **`Atomquest!2026`** — see Demo credentials above.
-
-## Demo walkthrough
-
-1. **Login** as Admin → open `/admin/cycles` → Active cycle is in `q2` phase
-2. **Switch to Maya (Manager)** → `/team/approvals` shows Arjun + Noah pending → review and approve one, return the other with a reason
-3. **Switch to Priya (Employee)** → `/check-ins` is open for Q2 → fill in actuals, watch live score badges update → save
-4. **Switch back to Admin** → `/admin/audit-log` → expand any row to see field-level JSON diff
-5. **Hit ⌘K** anywhere to navigate fast
-6. **`/analytics`** for the management overview
-
-## Architecture
-
-```
-Next.js 15 (App Router)
-├── (auth) — split-screen login/signup with demo cred cards
-└── (dashboard)
-    ├── layout.tsx           — sidebar + topbar shell, RLS-aware nav
-    ├── dashboard/           — role-aware home (employee / manager / admin variants)
-    ├── goals/               — list + new + detail (+ server actions)
-    ├── team/                — roster + approvals + per-member detail
-    ├── check-ins/           — current quarter + history
-    ├── admin/               — cycles, users, thrust areas, audit log, unlock requests, escalation
-    ├── reports/             — achievement (CSV) + completion (charts)
-    ├── analytics/           — full management analytics page
-    └── settings/            — profile, theme, notification prefs
-
-lib/
-├── supabase/{client,server,middleware}.ts — @supabase/ssr canonical pattern
-├── scoring/compute-score.ts               — UoM-aware scoring engine (mirrored in SQL)
-├── validations/goal.ts                    — zod schemas (re-validated server-side)
-├── cycle.ts                               — phase helpers
-├── email/                                 — Resend templates (graceful when no key)
-├── teams/                                 — Optional Teams Adaptive Cards (webhook URL)
-├── auth/entra-sync.ts                     — SSO metadata → profile role / reporting line helpers
-└── utils.ts                               — cn, initials, formatPercent
-
-supabase/
-├── migrations/0001_enums_tables.sql       — full schema (enums, 8 core tables)
-├── migrations/0002_rls_policies.sql       — role + lock enforcement at DB layer
-├── migrations/0003_audit_triggers.sql     — generic audit_trigger_fn + handle_new_user
-├── migrations/0004_views_functions.sql    — compute_score(), helpers, views
-├── migrations/0005_shared_goals.sql       — shared KPI triggers + recipients view
-├── migrations/0006_escalation.sql         — escalation_rules + escalation_log + RLS
-└── seed.sql                               — 1 admin + 3 managers + 12 employees
-```
-
-## Key non-obvious decisions
-
-- **Audit logging via Postgres triggers** — the `audit_trigger_fn()` runs on every write to watched tables, so application code can never forget to log. The trigger captures `OLD` and `NEW` as JSONB so the audit drawer can show field-level diffs.
-- **Lock enforcement in RLS, not application code** — the `goal_sheets: employee updates own (not locked)` policy blocks any write to a locked sheet at the database level. Even a misbehaving server action can't bypass it.
-- **Cycle phase gating in server actions** — `submitForApproval` reads `cycles.current_phase` and refuses outside `goal_setting`. The check-in action does the same for Q1–Q4.
-- **Single `useGoalSheetValidation` hook** drives both UI feedback (red borders, weightage bar color, submit-disabled tooltip) and the gating logic, then `goalSheetInputSchema` re-runs on the server.
-- **Manual phase advance in admin UI** is the demo lever. In production this would be a `pg_cron` job that fires on the configured `q2_opens` etc dates — keep this as a talking point for governance reviews.
-- **Scoring duplicated in SQL** (`public.compute_score`) so report views and RPCs can stay aggregated in the database, away from `n*4` round trips.
-- **Shared KPIs via DB triggers** (`0005_shared_goals.sql`) — a manager pushes a goal to multiple employees; each gets a child row locked to the parent's `uom/target/title`. Achievements entered by the parent fan-out to all children via a `SECURITY DEFINER` trigger, and child writes are blocked at trigger depth. Recipients can only adjust their own weightage.
-- **Manager inline edits during review** — `managerUpdateGoals` lets a manager tweak targets/weightage on a submitted sheet without forcing a return loop, with full audit logging.
-- **Stale-session handling in middleware** — `refresh_token_not_found` errors clear `sb-*` cookies on the redirect response and reduce console spam to a single `[auth]` warning line.
-- **Rule-driven escalation engine** (`0006_escalation.sql`) — admin-managed `escalation_rules` are evaluated on demand by `runEscalationCheck`, deduped via a unique partial index `(rule_id, employee_id, fired_at::date) where resolved_at is null`. Each fire emits in-app notifications, an optional Resend email when configured, and (if `TEAMS_WEBHOOK_URL` is set) a Teams Adaptive Card.
-- **Teams Adaptive Cards** — `lib/teams/index.ts` posts to Incoming Webhooks when `TEAMS_WEBHOOK_URL` is set; **otherwise no-op**. This submission leaves the URL unset.
-- **Entra group→role mapping** (`AZURE_GROUP_*`) activates only when JWT `groups` intersects mapped Object IDs — **hackathon tenants may leave groups empty**; full role demos use seeded Supabase passwords; `app/auth/callback/route.ts` still syncs metadata on SSO per `lib/auth/entra-sync.ts`.
-
-## Microsoft Entra (Azure AD) SSO setup
-
-The Microsoft sign-in button on `/login` is wired to the standard Supabase OAuth PKCE flow. No app code changes are needed once Supabase is configured — the work is on the Supabase + Entra side.
-
-1. **Azure portal** → App registrations → **New registration**.
-   * Redirect URI: `https://<your-supabase-ref>.supabase.co/auth/v1/callback`
-   * Front-channel logout: `https://your-app/login`
-2. **Certificates & secrets** → New client secret → copy the **Value**.
-3. **Token configuration** → Add optional claim → `groups` (Group ID) for ID + Access tokens. This is what powers role mapping.
-4. **API permissions** → Microsoft Graph → `User.Read`, `email`, `openid`, `profile`, `offline_access`. Grant admin consent.
-5. **Supabase Dashboard** → Authentication → Providers → **Azure** → enable, paste the Application (client) ID, Directory (tenant) ID, and Client Secret.
-6. Create three Entra groups (e.g. `AtomQuest-Admin`, `AtomQuest-Manager`, `AtomQuest-Employee`) and copy their Object IDs into `AZURE_GROUP_ADMIN`, `AZURE_GROUP_MANAGER`, `AZURE_GROUP_EMPLOYEE` in `.env.local`.
-7. Add target users to the right groups; sign in via Microsoft on `/login` and the profile row is created/updated with the correct role automatically.
-
-If **group env vars are blank** or **`groups`** never arrives in JWT, or **nobody sits in mapped Entra groups**, SSO still works — new users behave like **`employee`** until admins adjust `/admin/users` (same behaviour as omitting mappings).
-
-### Checklist (BRD §5.1 Microsoft Entra)
-
-| Capability | What you do | Notes |
-|------------|--------------|-------|
-| **SSO for employees/managers** | Enable **Azure** in Supabase, register an Entra **Web** app redirecting to **`https://<ref>.supabase.co/auth/v1/callback`**, paste Client ID, tenant URL, secret | Uses `/login` → **Sign in with Microsoft** and `app/auth/callback` PKCE completion |
-| **Role from Azure AD groups** | Create groups (Admin / Manager / Employee), expose **`groups`** as optional claims (group **Object IDs**), set **`AZURE_GROUP_ADMIN`**, **`AZURE_GROUP_MANAGER`**, **`AZURE_GROUP_EMPLOYEE`** in `.env.local` | On each SSO sign-in we map group membership → `profiles.role`. Verify after first login: Supabase Dashboard → Authentication → Users → **user_metadata / raw_app_meta_data** contains a `groups` array |
-| **Reporting line (`manager_id`)** | Ensure the identity token exposes the manager address as **`manager_email`**, **`manager_upn`**, or **`reports_to_mail`** inside metadata Supabase merges into `user.user_metadata` (claims mapping / directory extension / SSO attribute — tenant-specific). **Seed or provision the manager’s user first** so `profiles.email` matches that value exactly | AtomQuest resolves the manager FK by **`profiles.email`**. If claims are absent, SSO still works — keep assigning managers manually or via `/admin/users` |
-
-**Tip:** Personal Microsoft accounts will not populate corporate `department`/`groups`; use work accounts aligned with Entra claims.
-
-## Deploy
+SQL migrations live in **`supabase/migrations/`** (schema, RLS, audit triggers, views, shared goals, escalation). **`supabase/seed.sql`** provides demo users and sample data.
 
 ```bash
-# Push to GitHub then import on Vercel
-# Set env vars on Vercel: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
-# SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SITE_URL,
-# (optional) RESEND_API_KEY, RESEND_FROM_EMAIL
-# (optional) TEAMS_WEBHOOK_URL — unset in hackathon submission; see "Hackathon submission" above.
-# (optional) AZURE_GROUP_ADMIN/MANAGER/EMPLOYEE — IDs may exist; demo groups unpopulated; judges use seeded logins.
-# Build command: npm run build
-# Output:        .next
+npm run db:push    # apply migrations to linked remote
+npm run db:reset   # local: migrations + seed
+```
+
+## Demo accounts
+
+Seeded password for all demo users: **`Atomquest!2026`**
+
+| Role | Email | Suggested exploration |
+|------|-------|------------------------|
+| Admin | `admin@atomquest.demo` | Cycles, users, audit log, escalation |
+| Manager | `maya.patel@atomquest.demo` | Team, approvals, assign goals |
+| Employee | `priya.iyer@atomquest.demo` | My goals, check-ins |
+
+Additional managers and employees are listed in `supabase/seed.sql`. The login page includes quick-fill shortcuts for common demo accounts.
+
+## Project structure
+
+```
+app/
+  (auth)/          # Login, sign-up, auth callback
+  (dashboard)/     # Dashboard, goals, team, check-ins, admin, reports, analytics, settings
+lib/
+  supabase/        # Browser + server Supabase clients, middleware
+  validations/     # Zod schemas (e.g. goals)
+  scoring/         # Achievement scoring (aligned with SQL helpers)
+  email/, teams/   # Optional outbound notifications
+components/        # Shared UI
+supabase/migrations/
+supabase/seed.sql
 ```
 
 ## Scripts
 
-| Script            | Action                                        |
-|-------------------|-----------------------------------------------|
-| `npm run dev`     | Local dev server                              |
-| `npm run build`   | Production build                              |
-| `npm run start`   | Start production build                        |
-| `npm run lint`    | ESLint                                        |
-| `npm run typecheck` | `tsc --noEmit`                              |
-| `npm run db:reset`  | `supabase db reset` (re-runs migrations + seed) |
-| `npm run db:push`   | `supabase db push` (apply migrations to remote) |
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Development server |
+| `npm run build` | Production build |
+| `npm run start` | Run production build |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run db:reset` | Local Supabase reset (migrations + seed) |
+| `npm run db:push` | Push migrations to linked remote |
+
+## Deployment
+
+Deploy on **Vercel** (or any Node host): set the same environment variables as production, point `NEXT_PUBLIC_SITE_URL` at the deployed origin, and configure Supabase Auth redirect URLs for that host. Enable the Azure auth provider in Supabase if you use Microsoft sign-in.
+
+## Optional: Microsoft Entra (Azure AD) SSO
+
+1. Register an app in Entra and add Supabase’s redirect URI: `https://<project-ref>.supabase.co/auth/v1/callback`.
+2. In **Supabase → Authentication → Providers**, enable **Azure** and add client ID, secret, and tenant.
+3. Optionally expose **`groups`** in tokens and set `AZURE_GROUP_ADMIN`, `AZURE_GROUP_MANAGER`, `AZURE_GROUP_EMPLOYEE` in `.env.local` to map directory groups to app roles. If groups are not mapped, new SSO users default to **employee** until an admin updates **Users**.
+
+Details vary by tenant; see [Supabase SSO with Azure](https://supabase.com/docs/guides/auth/social-login/auth-azure).

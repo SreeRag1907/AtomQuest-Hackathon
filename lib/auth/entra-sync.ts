@@ -18,14 +18,22 @@ import type { Profile, UserRole } from "@/types/database";
  * configuration" → "Optional claim: groups".
  */
 
-interface EntraMetadata {
+export interface EntraMetadata {
   full_name?: string;
   name?: string;
   email?: string;
   preferred_username?: string;
   job_title?: string;
   department?: string;
-  groups?: string[];
+  /** Entra Group Object IDs; may be missing unless optional `groups` claim is enabled. */
+  groups?: unknown;
+  /**
+   * If you map manager mail / UPN into the token (claims mapping, schema extension,
+   * or Entra SSO attribute), put it here so `/auth/callback` can resolve profiles.manager_id.
+   */
+  manager_email?: string;
+  manager_upn?: string;
+  reports_to_mail?: string;
 }
 
 export interface EntraSyncResult {
@@ -33,6 +41,8 @@ export interface EntraSyncResult {
   full_name: string;
   department: string | null;
   role: UserRole;
+  /** Manager match key (email-ish); resolved to FK in callback via profiles.email */
+  manager_lookup: string | null;
 }
 
 const ROLE_PRECEDENCE: UserRole[] = ["admin", "manager", "employee"];
@@ -45,6 +55,23 @@ function parseGroupList(envValue: string | undefined): Set<string> {
       .map((s) => s.trim())
       .filter(Boolean)
   );
+}
+
+/** Normalise Entra/WIF `groups` claim (array, JSON string, or single string). */
+export function normaliseGroupsClaim(groups: unknown): string[] {
+  if (groups == null) return [];
+  if (Array.isArray(groups)) return groups.filter((x): x is string => typeof x === "string");
+  if (typeof groups === "string") {
+    try {
+      const parsed = JSON.parse(groups) as unknown;
+      if (Array.isArray(parsed))
+        return parsed.filter((x): x is string => typeof x === "string");
+      return [groups];
+    } catch {
+      return [groups];
+    }
+  }
+  return [];
 }
 
 export function resolveEntraRole(groups: string[] | undefined): UserRole | null {
@@ -69,16 +96,34 @@ export function resolveEntraRole(groups: string[] | undefined): UserRole | null 
  * Build a profile patch from Entra claims for an upsert into `profiles`.
  * Falls back to `existing` for any field the IdP didn't supply.
  */
+function normalizeManagerLookup(meta: EntraMetadata): string | null {
+  const raw =
+    meta.manager_email?.trim() ||
+    meta.manager_upn?.trim() ||
+    meta.reports_to_mail?.trim();
+  if (!raw) return null;
+  return raw.replace(/^mailto:/i, "").trim();
+}
+
 export function buildProfileFromEntra(
   metadata: EntraMetadata,
-  existing: Pick<Profile, "email" | "full_name" | "department" | "role"> | null
+  existing:
+    | Pick<Profile, "email" | "full_name" | "department" | "role">
+    | null
 ): EntraSyncResult {
+  const groups = normaliseGroupsClaim(metadata.groups);
   const email =
     metadata.email ?? metadata.preferred_username ?? existing?.email ?? "";
   const fullName =
     metadata.full_name ?? metadata.name ?? existing?.full_name ?? email;
   const department = metadata.department ?? existing?.department ?? null;
-  const claimedRole = resolveEntraRole(metadata.groups);
+  const claimedRole = resolveEntraRole(groups);
   const role: UserRole = claimedRole ?? existing?.role ?? "employee";
-  return { email, full_name: fullName, department, role };
+  return {
+    email,
+    full_name: fullName,
+    department,
+    role,
+    manager_lookup: normalizeManagerLookup(metadata),
+  };
 }

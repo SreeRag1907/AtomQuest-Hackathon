@@ -13,9 +13,9 @@ Enterprise goal-setting and performance tracking — built end to end on **Next.
 - **Reports**: achievement (filterable + CSV export) and completion (charts + drill-down)
 - **Analytics**: KPI cards, QoQ trends, donut + bar + stacked distributions, department × quarter heatmap, manager effectiveness, employee drill-down
 - **Escalation engine**: configurable SLA rules (goals not submitted / not approved / check-in pending) with manual `Run check now` and per-rule notify toggles for employee / manager / HR
-- **Microsoft Teams Adaptive Cards** posted alongside emails for goal submitted, approved, returned, and escalation events (graceful no-op without `TEAMS_WEBHOOK_URL`)
-- **Microsoft Entra (Azure AD) SSO** ready out of the box — group→role mapping is env-driven so you can wire it without redeploying
-- **Stretch bonuses**: Resend email templates (gracefully no-ops without `RESEND_API_KEY`) and a `⌘K` / `Ctrl+K` command palette
+- **Microsoft Teams Adaptive Cards** (bonus): wired to **`TEAMS_WEBHOOK_URL`** — code posts cards next to emails; **this hackathon submission does not configure a webhook** (org Teams incoming webhooks aren’t available on consumer / Communities-only clients)
+- **Microsoft Entra SSO** (bonus): **`/login` + `/auth/callback`** PKCE sync; **`AZURE_GROUP_*` role mapping requires Entra groups with members + optional `groups` claim** — **not populated in our demo tenant**, so judges should use **seeded email/password roles** (`@atomquest.demo`); SSO remains optional infra
+- **Stretch bonuses**: Resend email templates (optional `RESEND_API_KEY`; verify a sender domain at Resend) and a `⌘K` / `Ctrl+K` command palette
 
 ## Tech stack
 
@@ -79,6 +79,18 @@ npm run dev
 
 The login screen has demo-cred quick-fill cards — one click signs you in.
 
+### Hackathon submission: Teams + Azure AD (what’s wired vs skipped)
+
+BRD Phase 1/2 demos use **nothing below** — they’re Section 5 “good-to-have” only:
+
+| Integration | Repo status | Submitted hackathon demo |
+|-------------|-------------|---------------------------|
+| **Teams** | `sendTeamsCard` + Adaptive templates in `lib/teams/` — **noop** without `TEAMS_WEBHOOK_URL` | **Not configured.** No Incoming Webhook URL (typical blocker: Communities-only Teams or org policy).
+| **Entra groups → role** | `AZURE_GROUP_ADMIN/MANAGER/EMPLOYEE` + `/auth/callback` sync (`lib/auth/entra-sync.ts`) | **`AZURE_GROUP_*` IDs may set; Azure groups aren’t populated with demo members** → role-from-groups inactive; SSO users default to **`employee`** until `/admin/users` or future IAM rollout.
+| **Microsoft sign-in** | Enable Azure provider in Supabase + redirect URI per README | Optional; credentials for judges remain **three seeded accounts**.
+
+**Evaluators:** All role journeys are proven with **`admin@atomquest.demo`, `maya.patel@atomquest.demo`, seeded employees**, password **`Atomquest!2026`** — see Demo credentials above.
+
 ## Demo walkthrough
 
 1. **Login** as Admin → open `/admin/cycles` → Active cycle is in `q2` phase
@@ -99,7 +111,7 @@ Next.js 15 (App Router)
     ├── goals/               — list + new + detail (+ server actions)
     ├── team/                — roster + approvals + per-member detail
     ├── check-ins/           — current quarter + history
-    ├── admin/               — cycles, users, thrust areas, audit log, unlock requests
+    ├── admin/               — cycles, users, thrust areas, audit log, unlock requests, escalation
     ├── reports/             — achievement (CSV) + completion (charts)
     ├── analytics/           — full management analytics page
     └── settings/            — profile, theme, notification prefs
@@ -110,6 +122,8 @@ lib/
 ├── validations/goal.ts                    — zod schemas (re-validated server-side)
 ├── cycle.ts                               — phase helpers
 ├── email/                                 — Resend templates (graceful when no key)
+├── teams/                                 — Optional Teams Adaptive Cards (webhook URL)
+├── auth/entra-sync.ts                     — SSO metadata → profile role / reporting line helpers
 └── utils.ts                               — cn, initials, formatPercent
 
 supabase/
@@ -133,9 +147,9 @@ supabase/
 - **Shared KPIs via DB triggers** (`0005_shared_goals.sql`) — a manager pushes a goal to multiple employees; each gets a child row locked to the parent's `uom/target/title`. Achievements entered by the parent fan-out to all children via a `SECURITY DEFINER` trigger, and child writes are blocked at trigger depth. Recipients can only adjust their own weightage.
 - **Manager inline edits during review** — `managerUpdateGoals` lets a manager tweak targets/weightage on a submitted sheet without forcing a return loop, with full audit logging.
 - **Stale-session handling in middleware** — `refresh_token_not_found` errors clear `sb-*` cookies on the redirect response and reduce console spam to a single `[auth]` warning line.
-- **Rule-driven escalation engine** (`0006_escalation.sql`) — admin-managed `escalation_rules` are evaluated on demand by `runEscalationCheck`, deduped via a unique partial index `(rule_id, employee_id, fired_at::date) where resolved_at is null`. Each fire emits in-app notifications, an email (Resend), and a Teams Adaptive Card (webhook).
-- **Teams Adaptive Cards** are sent in parallel with email — `lib/teams/index.ts` is a thin wrapper over `TEAMS_WEBHOOK_URL`. If the env var is missing every call is a no-op so local dev / judge environments never see a 401.
-- **Entra group→role mapping is env-driven** (`AZURE_GROUP_ADMIN/MANAGER/EMPLOYEE`) so the role policy can be retuned in production without code changes; `app/auth/callback/route.ts` upserts the profile on every OAuth sign-in via `lib/auth/entra-sync.ts`.
+- **Rule-driven escalation engine** (`0006_escalation.sql`) — admin-managed `escalation_rules` are evaluated on demand by `runEscalationCheck`, deduped via a unique partial index `(rule_id, employee_id, fired_at::date) where resolved_at is null`. Each fire emits in-app notifications, an optional Resend email when configured, and (if `TEAMS_WEBHOOK_URL` is set) a Teams Adaptive Card.
+- **Teams Adaptive Cards** — `lib/teams/index.ts` posts to Incoming Webhooks when `TEAMS_WEBHOOK_URL` is set; **otherwise no-op**. This submission leaves the URL unset.
+- **Entra group→role mapping** (`AZURE_GROUP_*`) activates only when JWT `groups` intersects mapped Object IDs — **hackathon tenants may leave groups empty**; full role demos use seeded Supabase passwords; `app/auth/callback/route.ts` still syncs metadata on SSO per `lib/auth/entra-sync.ts`.
 
 ## Microsoft Entra (Azure AD) SSO setup
 
@@ -151,7 +165,17 @@ The Microsoft sign-in button on `/login` is wired to the standard Supabase OAuth
 6. Create three Entra groups (e.g. `AtomQuest-Admin`, `AtomQuest-Manager`, `AtomQuest-Employee`) and copy their Object IDs into `AZURE_GROUP_ADMIN`, `AZURE_GROUP_MANAGER`, `AZURE_GROUP_EMPLOYEE` in `.env.local`.
 7. Add target users to the right groups; sign in via Microsoft on `/login` and the profile row is created/updated with the correct role automatically.
 
-If `AZURE_GROUP_*` env vars are blank, sign-ins still succeed but new users default to the `employee` role — admins can re-assign from `/admin/users`.
+If **group env vars are blank** or **`groups`** never arrives in JWT, or **nobody sits in mapped Entra groups**, SSO still works — new users behave like **`employee`** until admins adjust `/admin/users` (same behaviour as omitting mappings).
+
+### Checklist (BRD §5.1 Microsoft Entra)
+
+| Capability | What you do | Notes |
+|------------|--------------|-------|
+| **SSO for employees/managers** | Enable **Azure** in Supabase, register an Entra **Web** app redirecting to **`https://<ref>.supabase.co/auth/v1/callback`**, paste Client ID, tenant URL, secret | Uses `/login` → **Sign in with Microsoft** and `app/auth/callback` PKCE completion |
+| **Role from Azure AD groups** | Create groups (Admin / Manager / Employee), expose **`groups`** as optional claims (group **Object IDs**), set **`AZURE_GROUP_ADMIN`**, **`AZURE_GROUP_MANAGER`**, **`AZURE_GROUP_EMPLOYEE`** in `.env.local` | On each SSO sign-in we map group membership → `profiles.role`. Verify after first login: Supabase Dashboard → Authentication → Users → **user_metadata / raw_app_meta_data** contains a `groups` array |
+| **Reporting line (`manager_id`)** | Ensure the identity token exposes the manager address as **`manager_email`**, **`manager_upn`**, or **`reports_to_mail`** inside metadata Supabase merges into `user.user_metadata` (claims mapping / directory extension / SSO attribute — tenant-specific). **Seed or provision the manager’s user first** so `profiles.email` matches that value exactly | AtomQuest resolves the manager FK by **`profiles.email`**. If claims are absent, SSO still works — keep assigning managers manually or via `/admin/users` |
+
+**Tip:** Personal Microsoft accounts will not populate corporate `department`/`groups`; use work accounts aligned with Entra claims.
 
 ## Deploy
 
@@ -159,8 +183,9 @@ If `AZURE_GROUP_*` env vars are blank, sign-ins still succeed but new users defa
 # Push to GitHub then import on Vercel
 # Set env vars on Vercel: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
 # SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SITE_URL,
-# (optional) RESEND_API_KEY, TEAMS_WEBHOOK_URL,
-# (optional) AZURE_GROUP_ADMIN/MANAGER/EMPLOYEE.
+# (optional) RESEND_API_KEY, RESEND_FROM_EMAIL
+# (optional) TEAMS_WEBHOOK_URL — unset in hackathon submission; see "Hackathon submission" above.
+# (optional) AZURE_GROUP_ADMIN/MANAGER/EMPLOYEE — IDs may exist; demo groups unpopulated; judges use seeded logins.
 # Build command: npm run build
 # Output:        .next
 ```
@@ -176,6 +201,3 @@ If `AZURE_GROUP_*` env vars are blank, sign-ins still succeed but new users defa
 | `npm run typecheck` | `tsc --noEmit`                              |
 | `npm run db:reset`  | `supabase db reset` (re-runs migrations + seed) |
 | `npm run db:push`   | `supabase db push` (apply migrations to remote) |
-#   A t o m Q u e s t - H a c k a t h o n 
- 
- 

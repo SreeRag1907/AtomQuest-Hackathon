@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { buildProfileFromEntra } from "@/lib/auth/entra-sync";
+import { buildProfileFromEntra, type EntraMetadata } from "@/lib/auth/entra-sync";
 import type { Profile } from "@/types/database";
 
 /**
@@ -36,26 +36,35 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Sync Entra claims into our profiles table — keeps role/department fresh.
-  const { data: { user } } = await supabase.auth.getUser();
+  // Sync Entra claims into profiles — role, department, optional reporting-line (manager).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (user) {
+    const metadata = coerceEntraMetadata(user.user_metadata);
+
     const { data: existing } = await supabase
       .from("profiles")
-      .select("email, full_name, department, role")
+      .select("email, full_name, department, role, manager_id")
       .eq("id", user.id)
-      .maybeSingle<Pick<Profile, "email" | "full_name" | "department" | "role">>();
+      .maybeSingle<
+        Pick<Profile, "email" | "full_name" | "department" | "role" | "manager_id">
+      >();
 
-    const patch = buildProfileFromEntra(user.user_metadata ?? {}, existing);
+    const patch = buildProfileFromEntra(metadata, existing);
+
+    const manager_id = await lookupManagerProfileId(supabase, patch.manager_lookup);
 
     if (existing) {
-      await supabase
-        .from("profiles")
-        .update({
-          full_name: patch.full_name,
-          department: patch.department,
-          role: patch.role,
-        })
-        .eq("id", user.id);
+      const payload: Record<string, unknown> = {
+        full_name: patch.full_name,
+        department: patch.department,
+        role: patch.role,
+      };
+      /** Only overwrite reporting line when Entra sends a manager key we resolve */
+      if (patch.manager_lookup && manager_id) payload.manager_id = manager_id;
+
+      await supabase.from("profiles").update(payload).eq("id", user.id);
     } else {
       await supabase.from("profiles").insert({
         id: user.id,
@@ -63,10 +72,42 @@ export async function GET(request: NextRequest) {
         full_name: patch.full_name,
         department: patch.department,
         role: patch.role,
+        manager_id,
         is_active: true,
       });
     }
   }
 
   return NextResponse.redirect(`${origin}${next}`);
+}
+
+/** Flatten common Supabase + Entra nesting so custom claims are visible alongside root keys */
+function coerceEntraMetadata(raw: Record<string, unknown> | undefined): EntraMetadata {
+  const root = raw ?? {};
+  const cc = root.custom_claims;
+  let nested: Record<string, unknown> = {};
+  if (cc && typeof cc === "object" && !Array.isArray(cc))
+    nested = cc as Record<string, unknown>;
+
+  return { ...root, ...nested } as EntraMetadata;
+}
+
+type SupabaseServer = Awaited<ReturnType<typeof createClient>>;
+
+async function lookupManagerProfileId(
+  supabase: SupabaseServer,
+  lookup: string | null
+): Promise<string | null> {
+  if (!lookup?.trim()) return null;
+  const raw = lookup.trim();
+  const variants = [...new Set([raw, raw.toLowerCase()])];
+  for (const variant of variants) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", variant)
+      .maybeSingle<{ id: string }>();
+    if (data?.id) return data.id;
+  }
+  return null;
 }

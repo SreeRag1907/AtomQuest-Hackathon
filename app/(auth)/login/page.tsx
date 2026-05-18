@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Atom, Sparkles } from "lucide-react";
 import { LoginForm } from "./login-form";
 import { Skeleton } from "@/components/ui/skeleton";
+import { showDemoLoginUi } from "@/lib/show-demo-login";
 
 export default function LoginPage() {
   return (
@@ -22,10 +23,12 @@ export default function LoginPage() {
             Set objectives, track progress through the year, and run quarterly check-ins
             with audit-grade governance built in.
           </p>
-          <div className="flex items-center gap-2 text-sm text-indigo-200">
-            <Sparkles className="h-4 w-4" />
-            Demo credentials available — click and go.
-          </div>
+          {showDemoLoginUi() ? (
+            <div className="flex items-center gap-2 text-sm text-indigo-200">
+              <Sparkles className="h-4 w-4" />
+              Demo credentials available — click and go.
+            </div>
+          ) : null}
         </div>
 
         <div className="text-xs text-indigo-200">

@@ -57,7 +57,13 @@ Copy **`.env.local.example`** to `.env.local`. Required values:
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role (admin invites, server-only operations) |
 | `NEXT_PUBLIC_SITE_URL` | Canonical app URL (auth redirect links) |
 
-Optional: `RESEND_*`, `TEAMS_WEBHOOK_URL`, Azure group IDs for SSO role mapping — see comments in `.env.local.example`.
+Optional:
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_SHOW_DEMO_LOGINS` | Login one-click demo cards + hero hint. Default **on** (omit or any value except `false`). Set to **`false`** for a production-style login. |
+
+Other optional keys: `RESEND_*`, `TEAMS_WEBHOOK_URL`, Azure group IDs — see `.env.local.example`.
 
 For **local development** when Supabase auth email rate limits block invites or sign-up, you can set `AUTH_DEV_CREATE_USER_WITHOUT_EMAIL=true` (see example file). **Do not enable in production.**
 

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { showDemoLoginUi } from "@/lib/show-demo-login";
 
 const DEMO_CREDS = [
   {
@@ -195,42 +196,44 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <Card className="border-dashed bg-muted/30 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Demo accounts
-          </p>
-          <span className="text-[10px] text-muted-foreground">
-            password: <code className="font-mono">{DEMO_PASSWORD}</code>
-          </span>
-        </div>
-        <div className="grid gap-2">
-          {DEMO_CREDS.map((cred) => (
-            <button
-              key={cred.role}
-              type="button"
-              disabled={isPending}
-              onClick={() => {
-                setEmail(cred.email);
-                setPassword(DEMO_PASSWORD);
-                signIn(cred.email, DEMO_PASSWORD);
-              }}
-              className={cn(
-                "group flex items-center justify-between rounded-lg border bg-gradient-to-r p-3 text-left transition hover:border-primary/40",
-                cred.accent
-              )}
-            >
-              <div>
-                <div className="text-sm font-medium text-foreground">{cred.role}</div>
-                <div className="text-xs text-muted-foreground">{cred.description}</div>
-              </div>
-              <div className="text-xs font-medium opacity-80 group-hover:opacity-100">
-                Try as {cred.role} →
-              </div>
-            </button>
-          ))}
-        </div>
-      </Card>
+      {showDemoLoginUi() ? (
+        <Card className="border-dashed bg-muted/30 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Demo accounts
+            </p>
+            <span className="text-[10px] text-muted-foreground">
+              password: <code className="font-mono">{DEMO_PASSWORD}</code>
+            </span>
+          </div>
+          <div className="grid gap-2">
+            {DEMO_CREDS.map((cred) => (
+              <button
+                key={cred.role}
+                type="button"
+                disabled={isPending}
+                onClick={() => {
+                  setEmail(cred.email);
+                  setPassword(DEMO_PASSWORD);
+                  signIn(cred.email, DEMO_PASSWORD);
+                }}
+                className={cn(
+                  "group flex items-center justify-between rounded-lg border bg-gradient-to-r p-3 text-left transition hover:border-primary/40",
+                  cred.accent
+                )}
+              >
+                <div>
+                  <div className="text-sm font-medium text-foreground">{cred.role}</div>
+                  <div className="text-xs text-muted-foreground">{cred.description}</div>
+                </div>
+                <div className="text-xs font-medium opacity-80 group-hover:opacity-100">
+                  Try as {cred.role} →
+                </div>
+              </button>
+            ))}
+          </div>
+        </Card>
+      ) : null}
     </div>
   );
 }

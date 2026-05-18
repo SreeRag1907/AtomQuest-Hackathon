@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Power } from "lucide-react";
+import { ChevronDown, Loader2, Power } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,7 +58,7 @@ export function CycleControls({ cycle }: { cycle: Cycle }) {
   }
 
   return (
-    <div className="flex items-center justify-end gap-1">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       {!cycle.is_active && (
         <Button size="sm" variant="outline" onClick={handleActivate} disabled={isPending}>
           {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Power className="h-3 w-3" />}
@@ -67,21 +67,28 @@ export function CycleControls({ cycle }: { cycle: Cycle }) {
       )}
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
-          <Button size="sm" variant="ghost" disabled={!cycle.is_active}>
-            Advance phase…
+          <Button
+            size="sm"
+            variant="secondary"
+            className="gap-1 font-normal"
+            disabled={!cycle.is_active || isPending}
+          >
+            Advance phase
+            <ChevronDown className="h-3.5 w-3.5 opacity-60" aria-hidden />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Set phase</DropdownMenuLabel>
+        <DropdownMenuContent align="end" className="min-w-[12rem]">
+          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Jump to phase</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {PHASES.map((p) => (
             <DropdownMenuItem
               key={p}
+              className="flex w-full justify-between gap-4"
               disabled={p === cycle.current_phase || isPending}
               onClick={() => handleSetPhase(p)}
             >
-              {phaseLabel(p)}
-              {p === cycle.current_phase && <span className="ml-2 text-xs text-muted-foreground">(current)</span>}
+              <span>{phaseLabel(p)}</span>
+              {p === cycle.current_phase && <span className="text-xs text-muted-foreground">Now</span>}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

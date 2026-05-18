@@ -43,8 +43,8 @@ const NAV: NavSection[] = [
   {
     items: [
       { href: "/dashboard", label: "Dashboard", icon: Home },
-      { href: "/goals", label: "My goals", icon: Clipboard },
-      { href: "/check-ins", label: "Check-ins", icon: CheckSquare },
+      { href: "/goals", label: "My goals", icon: Clipboard, roles: ["employee", "manager"] },
+      { href: "/check-ins", label: "Check-ins", icon: CheckSquare, roles: ["employee", "manager"] },
     ],
   },
   {

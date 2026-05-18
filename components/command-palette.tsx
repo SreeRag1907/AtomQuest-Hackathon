@@ -39,10 +39,34 @@ interface PaletteItem {
 
 const ITEMS: PaletteItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Home, group: "Navigate" },
-  { href: "/goals", label: "My goals", icon: Clipboard, group: "Navigate" },
-  { href: "/goals/new", label: "Create goal sheet", icon: Clipboard, group: "Actions" },
-  { href: "/check-ins", label: "Current check-in", icon: CheckSquare, group: "Navigate" },
-  { href: "/check-ins/history", label: "Check-in history", icon: HistoryIcon, group: "Navigate" },
+  {
+    href: "/goals",
+    label: "My goals",
+    icon: Clipboard,
+    group: "Navigate",
+    roles: ["employee", "manager"],
+  },
+  {
+    href: "/goals/new",
+    label: "Create goal sheet",
+    icon: Clipboard,
+    group: "Actions",
+    roles: ["employee", "manager"],
+  },
+  {
+    href: "/check-ins",
+    label: "Current check-in",
+    icon: CheckSquare,
+    group: "Navigate",
+    roles: ["employee", "manager"],
+  },
+  {
+    href: "/check-ins/history",
+    label: "Check-in history",
+    icon: HistoryIcon,
+    group: "Navigate",
+    roles: ["employee", "manager"],
+  },
   { href: "/team", label: "Team", icon: Users, group: "Manager", roles: ["manager", "admin"] },
   { href: "/team/approvals", label: "Approvals queue", icon: ClipboardList, group: "Manager", roles: ["manager", "admin"] },
   { href: "/reports/achievement", label: "Achievement report", icon: FileText, group: "Reports" },

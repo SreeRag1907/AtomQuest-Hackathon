@@ -82,7 +82,9 @@ export interface Goal {
   uom_type: UomType;
   target: number | null;
   target_date: string | null;
-  weightage: number;
+  // Drafts may persist `null` (post-migration 0010). Submission enforces 10..100
+  // via Zod and the submit path.
+  weightage: number | null;
   is_shared: boolean;
   parent_goal_id: string | null;
   display_order: number;

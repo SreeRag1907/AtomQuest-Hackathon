@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import { profilesVisibleToViewer } from "@/lib/auth-visibility";
 import { PageHeader } from "@/components/page-header";
+import { CycleBanner } from "@/components/cycle-banner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SubmissionFunnel, QuarterlyBars, PendingList } from "./completion-charts";
 import type {
@@ -21,7 +22,7 @@ export default async function CompletionReportPage() {
     .from("cycles")
     .select("*")
     .eq("is_active", true)
-    .single<Cycle>();
+    .maybeSingle<Cycle>();
 
   const { data: profilesRaw } = await supabase
     .from("profiles")
@@ -94,6 +95,7 @@ export default async function CompletionReportPage() {
 
   return (
     <div className="space-y-6">
+      {cycle ? <CycleBanner cycle={cycle} /> : null}
       <PageHeader
         title="Completion report"
         description={

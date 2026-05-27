@@ -71,10 +71,19 @@ export function PendingList({
   sheets: GoalSheet[];
 }) {
   const sheetByEmp = new Map(sheets.map((s) => [s.employee_id, s]));
-  const items = profiles.map((p) => {
-    const sheet = sheetByEmp.get(p.id);
-    return { profile: p, sheet };
-  });
+  // "Pending submission" = no sheet at all OR sheet still in draft/returned.
+  // Submitted/approved/locked employees are excluded.
+  const items = profiles
+    .map((p) => ({ profile: p, sheet: sheetByEmp.get(p.id) }))
+    .filter(({ sheet }) => !sheet || sheet.status === "draft" || sheet.status === "returned");
+
+  if (items.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Everyone has submitted their goals for this cycle. Nice work!
+      </p>
+    );
+  }
 
   return (
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

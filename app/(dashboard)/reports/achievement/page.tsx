@@ -12,24 +12,30 @@ import type {
   ThrustArea,
 } from "@/types/database";
 
-export default async function AchievementReportPage() {
+export default async function AchievementReportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cycleId?: string }>;
+}) {
   const me = await requireProfile();
   const supabase = await createClient();
+  const { cycleId: cycleIdParam } = await searchParams;
 
   const { data: cycles } = await supabase
     .from("cycles")
     .select("*")
     .order("created_at", { ascending: false });
 
-  const { data: cycle } = await supabase
-    .from("cycles")
-    .select("*")
-    .eq("is_active", true)
-    .single<Cycle>();
+  const cyclesList = (cycles ?? []) as Cycle[];
+
+  // Choose the cycle to scope data fetch by: explicit query param, else active.
+  const activeCycle = cyclesList.find((c) => c.is_active) ?? null;
+  const selectedCycle =
+    (cycleIdParam ? cyclesList.find((c) => c.id === cycleIdParam) : null) ?? activeCycle;
 
   // RLS will scope automatically: employees see own data, managers see reports, admin sees all.
-  const { data: sheets } = cycle
-    ? await supabase.from("goal_sheets").select("*").eq("cycle_id", cycle.id)
+  const { data: sheets } = selectedCycle
+    ? await supabase.from("goal_sheets").select("*").eq("cycle_id", selectedCycle.id)
     : { data: [] as GoalSheet[] };
   const sheetIds = (sheets ?? []).map((s) => s.id);
   const employeeIds = [...new Set((sheets ?? []).map((s) => s.employee_id))];
@@ -70,8 +76,8 @@ export default async function AchievementReportPage() {
       />
       <Card>
         <AchievementReport
-          cycles={(cycles ?? []) as Cycle[]}
-          activeCycleId={cycle?.id ?? null}
+          cycles={cyclesList}
+          activeCycleId={selectedCycle?.id ?? null}
           sheets={(sheets ?? []) as GoalSheet[]}
           goals={(goals ?? []) as Goal[]}
           achievements={allAchievements}

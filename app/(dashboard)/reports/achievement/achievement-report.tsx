@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Papa from "papaparse";
-import * as XLSX from "xlsx";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Download, FileSpreadsheet, FileText, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -62,10 +61,24 @@ export function AchievementReport({
   employees,
   thrustAreas,
 }: Props) {
-  const [cycleId, setCycleId] = useState<string>(activeCycleId ?? cycles[0]?.id ?? "");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+  // activeCycleId already reflects the selected cycle on the server (see page.tsx).
+  // We use it as the canonical value so the dropdown stays in sync after server fetch.
+  const cycleId = activeCycleId ?? cycles[0]?.id ?? "";
   const [department, setDepartment] = useState("all");
   const [thrustAreaId, setThrustAreaId] = useState("all");
   const [search, setSearch] = useState("");
+
+  function setCycleId(next: string) {
+    const params = new URLSearchParams(searchParams?.toString());
+    if (next) params.set("cycleId", next);
+    else params.delete("cycleId");
+    startTransition(() => {
+      router.push(`?${params.toString()}`);
+    });
+  }
 
   const departments = useMemo(() => {
     const set = new Set(employees.map((e) => e.department).filter(Boolean) as string[]);
@@ -154,7 +167,8 @@ export function AchievementReport({
     }));
   }
 
-  function exportCsv() {
+  async function exportCsv() {
+    const { default: Papa } = await import("papaparse");
     const csv = Papa.unparse(exportRows());
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -165,10 +179,10 @@ export function AchievementReport({
     URL.revokeObjectURL(url);
   }
 
-  function exportXlsx() {
+  async function exportXlsx() {
+    const XLSX = await import("xlsx");
     const data = exportRows();
     const ws = XLSX.utils.json_to_sheet(data);
-    // Auto-fit columns roughly based on content length
     const colWidths = Object.keys(data[0] ?? {}).map((key) => {
       const headerLen = key.length;
       const maxCellLen = data.reduce((max, row) => {
@@ -190,14 +204,15 @@ export function AchievementReport({
     <div>
       <div className="flex flex-wrap items-center gap-2 border-b p-3">
         {cycles.length > 0 ? (
-          <Select value={cycleId} onValueChange={setCycleId}>
-            <SelectTrigger className="h-8 w-40">
+          <Select value={cycleId} onValueChange={setCycleId} disabled={isPending}>
+            <SelectTrigger className="h-8 w-40" aria-label="Cycle">
               <SelectValue placeholder="Cycle" />
             </SelectTrigger>
             <SelectContent>
               {cycles.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.name}
+                  {c.is_active ? " · active" : ""}
                 </SelectItem>
               ))}
             </SelectContent>

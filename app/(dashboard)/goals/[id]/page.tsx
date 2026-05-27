@@ -170,12 +170,12 @@ export default async function GoalSheetDetailPage({
             <div>
               <div className="text-sm font-medium text-destructive">Returned for rework</div>
               <p className="mt-1 text-sm text-foreground">{sheet.return_reason}</p>
+              {isOwner && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Update your goals below and resubmit when you&apos;re ready.
+                </p>
+              )}
             </div>
-            {isOwner && (
-              <Button asChild>
-                <Link href="/goals/new">Edit & resubmit</Link>
-              </Button>
-            )}
           </div>
         </div>
       )}

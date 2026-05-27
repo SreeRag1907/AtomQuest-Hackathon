@@ -172,13 +172,17 @@ export function GoalCard({
           )}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Thrust area</Label>
+              <Label htmlFor={`goal-${index}-thrust-area`}>Thrust area</Label>
               <Select
                 value={goal.thrust_area_id ?? ""}
                 onValueChange={(v) => onChange({ thrust_area_id: v })}
                 disabled={fieldDisabled}
               >
-                <SelectTrigger className={cn(fieldError("thrust_area_id") && "border-destructive")}>
+                <SelectTrigger
+                  id={`goal-${index}-thrust-area`}
+                  aria-invalid={!!fieldError("thrust_area_id") || undefined}
+                  className={cn(fieldError("thrust_area_id") && "border-destructive")}
+                >
                   <SelectValue placeholder="Select thrust area" />
                 </SelectTrigger>
                 <SelectContent>
@@ -193,13 +197,17 @@ export function GoalCard({
             </div>
 
             <div className="space-y-1.5">
-              <Label>UoM</Label>
+              <Label htmlFor={`goal-${index}-uom`}>UoM</Label>
               <Select
                 value={goal.uom_type}
                 onValueChange={(v) => onChange({ uom_type: v as UomType, target: null, target_date: null })}
                 disabled={fieldDisabled}
               >
-                <SelectTrigger className={cn(fieldError("uom_type") && "border-destructive")}>
+                <SelectTrigger
+                  id={`goal-${index}-uom`}
+                  aria-invalid={!!fieldError("uom_type") || undefined}
+                  className={cn(fieldError("uom_type") && "border-destructive")}
+                >
                   <SelectValue placeholder="Select UoM" />
                 </SelectTrigger>
                 <SelectContent>
@@ -215,11 +223,13 @@ export function GoalCard({
           </div>
 
           <div className="space-y-1.5">
-            <Label>Goal title</Label>
+            <Label htmlFor={`goal-${index}-title`}>Goal title</Label>
             <Input
+              id={`goal-${index}-title`}
               value={goal.title}
               onChange={(e) => onChange({ title: e.target.value })}
               placeholder="What do you want to achieve?"
+              aria-invalid={!!fieldError("title") || undefined}
               className={cn(fieldError("title") && "border-destructive")}
               disabled={fieldDisabled}
             />
@@ -227,8 +237,9 @@ export function GoalCard({
           </div>
 
           <div className="space-y-1.5">
-            <Label>Description</Label>
+            <Label htmlFor={`goal-${index}-description`}>Description</Label>
             <Textarea
+              id={`goal-${index}-description`}
               value={goal.description ?? ""}
               onChange={(e) => onChange({ description: e.target.value })}
               placeholder="Optional context, success criteria, links..."
@@ -239,7 +250,7 @@ export function GoalCard({
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>
+              <Label htmlFor={`goal-${index}-target`}>
                 {showTargetDate
                   ? "Target date"
                   : showTarget
@@ -248,14 +259,17 @@ export function GoalCard({
               </Label>
               {showTargetDate ? (
                 <Input
+                  id={`goal-${index}-target`}
                   type="date"
                   value={goal.target_date ?? ""}
                   onChange={(e) => onChange({ target_date: e.target.value })}
+                  aria-invalid={!!fieldError("target_date") || undefined}
                   className={cn(fieldError("target_date") && "border-destructive")}
                   disabled={fieldDisabled}
                 />
               ) : showTarget ? (
                 <Input
+                  id={`goal-${index}-target`}
                   type="number"
                   step="any"
                   value={goal.target ?? ""}
@@ -265,19 +279,21 @@ export function GoalCard({
                     })
                   }
                   placeholder={isPercent ? "0–100" : "Value"}
+                  aria-invalid={!!fieldError("target") || undefined}
                   className={cn(fieldError("target") && "border-destructive")}
                   disabled={fieldDisabled}
                 />
               ) : (
-                <Input value="0 (zero)" disabled />
+                <Input id={`goal-${index}-target`} value="0 (zero)" disabled />
               )}
               <ErrorText msg={fieldError("target") ?? fieldError("target_date")} />
             </div>
 
             <div className="space-y-1.5">
-              <Label>Weightage</Label>
+              <Label htmlFor={`goal-${index}-weightage`}>Weightage</Label>
               <div className="relative">
                 <Input
+                  id={`goal-${index}-weightage`}
                   type="number"
                   step="1"
                   min={10}
@@ -288,6 +304,7 @@ export function GoalCard({
                       weightage: e.target.value === "" ? null : Number(e.target.value),
                     })
                   }
+                  aria-invalid={!!fieldError("weightage") || undefined}
                   className={cn("pr-7", fieldError("weightage") && "border-destructive")}
                   disabled={readOnly}
                 />

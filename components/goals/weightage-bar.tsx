@@ -21,14 +21,24 @@ export function WeightageBar({ total, goalCount, maxGoals = 8 }: Props) {
         ? "bg-success"
         : "bg-warning";
 
+  const totalClass =
+    tone === "destructive"
+      ? "text-destructive"
+      : tone === "success"
+        ? "text-success"
+        : "text-warning";
+
   return (
     <div
       className={cn(
-        "sticky top-14 z-20 -mx-6 mb-4 border-b bg-background/95 px-6 py-3 backdrop-blur"
+        // Sticky + edge-to-edge: pull out of the parent's px-6 via negative
+        // inset on sm+ where the container has that padding, and zero on
+        // mobile where the page already extends to the edge.
+        "sticky top-14 z-20 mb-4 border-b bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6"
       )}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-muted-foreground" />
             <div className="text-sm">
@@ -36,20 +46,9 @@ export function WeightageBar({ total, goalCount, maxGoals = 8 }: Props) {
               <span className="text-muted-foreground"> of {maxGoals} goals</span>
             </div>
           </div>
-          <div className="hidden text-sm sm:block">
-            <span className="text-muted-foreground">Total weightage:</span>{" "}
-            <span
-              className={cn(
-                "font-semibold tabular-nums",
-                tone === "destructive"
-                  ? "text-destructive"
-                  : tone === "success"
-                    ? "text-success"
-                    : "text-warning"
-              )}
-            >
-              {total}%
-            </span>
+          <div className="text-sm">
+            <span className="text-muted-foreground">Total:</span>{" "}
+            <span className={cn("font-semibold tabular-nums", totalClass)}>{total}%</span>
             <span className="text-muted-foreground"> / 100%</span>
           </div>
         </div>
@@ -62,7 +61,7 @@ export function WeightageBar({ total, goalCount, maxGoals = 8 }: Props) {
           )}
           <Progress
             value={Math.min(total, 100)}
-            className="w-48"
+            className="w-full sm:w-48"
             indicatorClassName={indicatorClass}
           />
         </div>

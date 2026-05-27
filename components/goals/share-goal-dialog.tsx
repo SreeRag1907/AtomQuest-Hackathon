@@ -126,6 +126,7 @@ export function ShareGoalDialog({
         type="button"
         variant="ghost"
         size="icon"
+        aria-label={disabled ? disabledReason || "Share goal disabled" : "Share goal with team"}
         title={disabled ? disabledReason : "Share with team"}
         disabled={disabled}
         onClick={(e) => {
@@ -133,7 +134,7 @@ export function ShareGoalDialog({
           setOpen(true);
         }}
       >
-        <Share2 className="h-4 w-4" />
+        <Share2 className="h-4 w-4" aria-hidden />
       </Button>
     ) : (
       <Button

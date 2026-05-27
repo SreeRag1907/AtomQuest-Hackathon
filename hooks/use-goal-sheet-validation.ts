@@ -11,6 +11,9 @@ export interface GoalLike {
   target?: number | null;
   target_date?: string | null;
   weightage?: number | null;
+  /** Set when this row is a child of a shared parent goal. Such rows do not
+   *  count toward the 8-goal-per-sheet cap. */
+  parent_goal_id?: string | null;
 }
 
 export type GoalField =
@@ -51,8 +54,14 @@ export function useGoalSheetValidation(goals: GoalLike[]): ValidationResult {
     if (goals.length === 0) {
       errors.push({ goalIndex: -1, field: "form", message: "Add at least one goal" });
     }
-    if (goals.length > 8) {
-      errors.push({ goalIndex: -1, field: "form", message: "Maximum 8 goals allowed" });
+    // Cap counts only non-child goals; shared child goals don't count.
+    const primaryCount = goals.filter((g) => !g.parent_goal_id).length;
+    if (primaryCount > 8) {
+      errors.push({
+        goalIndex: -1,
+        field: "form",
+        message: "Maximum 8 goals allowed (excluding shared child goals)",
+      });
     }
 
     goals.forEach((g, idx) => {

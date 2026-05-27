@@ -50,9 +50,12 @@ export function computeSheetScore(
   for (const g of goals) {
     const a = achievements.find((x) => x.goal_id === g.id) ?? null;
     const score = computeScore(g, a);
-    if (score != null) {
-      total += (g.weightage * score) / 100;
-      weightSum += g.weightage;
+    // Drafts may have null weightage; those rows can't contribute until the
+    // sheet is submitted with weightages assigned.
+    const w = g.weightage ?? 0;
+    if (score != null && w > 0) {
+      total += (w * score) / 100;
+      weightSum += w;
     }
   }
   if (weightSum === 0) return null;

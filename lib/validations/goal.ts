@@ -22,6 +22,9 @@ export const goalInputSchema = z
   .object({
     // Client sends `null` for new rows; optional() alone does not accept null
     id: z.string().uuid().nullish(),
+    // Child goals (parent_goal_id != null) are received from shared-goal pushes
+    // and are excluded from the max-8 count. Optional for non-shared goals.
+    parent_goal_id: z.string().uuid().nullish(),
     thrust_area_id: z
       .string()
       .uuid({ message: "Pick a thrust area" })
@@ -76,9 +79,19 @@ export type GoalInput = z.infer<typeof goalInputSchema>;
 export const goalSheetInputSchema = z
   .object({
     cycle_id: z.string().uuid(),
-    goals: z.array(goalInputSchema).min(1, "At least one goal is required").max(8, "Maximum 8 goals allowed"),
+    goals: z.array(goalInputSchema).min(1, "At least one goal is required"),
   })
   .superRefine((sheet, ctx) => {
+    // The 8-goal cap counts only non-child (primary) goals; shared child goals
+    // pushed from another sheet do not count against the employee's own cap.
+    const nonChildCount = sheet.goals.filter((g) => !g.parent_goal_id).length;
+    if (nonChildCount > 8) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Maximum 8 goals allowed (excluding shared child goals)",
+        path: ["goals"],
+      });
+    }
     const total = sheet.goals.reduce((s, g) => s + (Number(g.weightage) || 0), 0);
     if (total !== 100) {
       ctx.addIssue({

@@ -99,17 +99,24 @@ export default async function CheckinHistoryPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Progress
-                        value={score ?? 0}
-                        className="w-40"
-                        indicatorClassName={
-                          score && score >= 80
-                            ? "bg-success"
-                            : score && score >= 50
-                              ? "bg-warning"
-                              : "bg-primary"
-                        }
-                      />
+                      {score == null ? (
+                        <div
+                          aria-label="No score yet"
+                          className="h-2 w-40 rounded-full bg-muted/50"
+                        />
+                      ) : (
+                        <Progress
+                          value={score}
+                          className="w-40"
+                          indicatorClassName={
+                            score >= 80
+                              ? "bg-success"
+                              : score >= 50
+                                ? "bg-warning"
+                                : "bg-primary"
+                          }
+                        />
+                      )}
                       <Badge variant="outline" className="tabular-nums">
                         {score == null ? "—" : `${Math.round(score)}% score`}
                       </Badge>

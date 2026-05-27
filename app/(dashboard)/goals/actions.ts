@@ -143,12 +143,6 @@ export async function submitForApproval(
 
   const cycle = await getActiveCycle();
   if (!cycle) return { ok: false, error: "No active cycle" };
-  if (!isGoalSettingPhase(cycle.current_phase)) {
-    return {
-      ok: false,
-      error: "Goal-setting window is closed. Contact your admin to extend it.",
-    };
-  }
 
   const supabase = await createClient();
 
@@ -162,6 +156,16 @@ export async function submitForApproval(
   }
   if (!["draft", "returned"].includes(sheet.status)) {
     return { ok: false, error: "Sheet has already been submitted" };
+  }
+
+  // Phase gate: drafts may only be submitted during the goal-setting window.
+  // Sheets that were returned by a manager are explicitly an invited rework and
+  // may be resubmitted at any time so the employee isn't stuck.
+  if (sheet.status === "draft" && !isGoalSettingPhase(cycle.current_phase)) {
+    return {
+      ok: false,
+      error: "Goal-setting window is closed. Contact your admin to extend it.",
+    };
   }
 
   const parsed = goalSheetInputSchema.safeParse({ cycle_id: cycle.id, goals });
@@ -273,7 +277,9 @@ export async function replaceGoals(
         target:
           g.uom_type === "timeline" ? null : g.uom_type === "zero" ? 0 : g.target,
         target_date: g.uom_type === "timeline" ? g.target_date : null,
-        weightage: g.weightage ?? 0,
+        // Drafts may persist a null weightage (migration 0010 allows NULL).
+        // Submission enforces 10..100 + sum=100 via Zod and the submit path.
+        weightage: g.weightage ?? null,
         display_order: idx,
       })
       .eq("id", g.id!)
@@ -291,7 +297,7 @@ export async function replaceGoals(
       target:
         g.uom_type === "timeline" ? null : g.uom_type === "zero" ? 0 : g.target,
       target_date: g.uom_type === "timeline" ? g.target_date : null,
-      weightage: g.weightage ?? 0,
+      weightage: g.weightage ?? null,
       display_order: idx,
     }));
     const { error: insErr } = await supabase.from("goals").insert(rows);

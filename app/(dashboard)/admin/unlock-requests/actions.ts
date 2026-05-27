@@ -86,15 +86,37 @@ export async function decideUnlockRequest(
     .eq("id", requestId)
     .single();
   if (!req) return { ok: false, error: "Request not found" };
+  if (req.status !== "pending") {
+    return { ok: false, error: `Request already ${req.status}` };
+  }
 
-  await supabase
-    .from("unlock_requests")
-    .update({ status: decision, reviewed_by: auth.user.id, reviewed_at: new Date().toISOString() })
-    .eq("id", requestId);
+  const reviewedAt = new Date().toISOString();
 
   if (decision === "approved") {
-    return await adminUnlockSheet(req.goal_sheet_id, reason || req.reason);
+    // Perform the unlock FIRST. Only on success do we mark the request approved.
+    // If the sheet update fails the request stays pending so admins can retry.
+    const unlock = await adminUnlockSheet(req.goal_sheet_id, reason || req.reason);
+    if (!unlock.ok) return unlock;
+
+    const { error: updateErr } = await supabase
+      .from("unlock_requests")
+      .update({ status: "approved", reviewed_by: auth.user.id, reviewed_at: reviewedAt })
+      .eq("id", requestId);
+    if (updateErr) {
+      // Sheet is now unlocked, but request didn't transition. Surface so the
+      // admin can retry the metadata write; the sheet state is still correct.
+      return { ok: false, error: `Sheet unlocked, but request status update failed: ${updateErr.message}` };
+    }
+    revalidatePath("/admin/unlock-requests");
+    return { ok: true };
   }
+
+  // Rejected path: mark request, notify, no sheet mutation.
+  const { error: rejectErr } = await supabase
+    .from("unlock_requests")
+    .update({ status: "rejected", reviewed_by: auth.user.id, reviewed_at: reviewedAt })
+    .eq("id", requestId);
+  if (rejectErr) return { ok: false, error: rejectErr.message };
 
   await supabase.from("notifications").insert({
     user_id: req.requested_by,

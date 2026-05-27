@@ -3,6 +3,7 @@ import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
+import { CycleBanner } from "@/components/cycle-banner";
 import { EmptyState } from "@/components/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -29,11 +30,13 @@ export default async function TeamPage() {
     .from("cycles")
     .select("*")
     .eq("is_active", true)
-    .single<Cycle>();
+    .maybeSingle<Cycle>();
 
+  // Active employees only — deactivated team members shouldn't clutter the roster.
   const teamQuery = supabase
     .from("profiles")
     .select("*")
+    .eq("is_active", true)
     .order("full_name");
   const { data: team } =
     me.role === "admin"
@@ -71,6 +74,7 @@ export default async function TeamPage() {
     return (
       <div className="space-y-6">
         <PageHeader title="Team" />
+        {cycle ? <CycleBanner cycle={cycle} /> : null}
         <EmptyState
           icon={Users}
           title={me.role === "admin" ? "No employees yet" : "No direct reports"}
@@ -86,6 +90,7 @@ export default async function TeamPage() {
 
   return (
     <div className="space-y-6">
+      {cycle ? <CycleBanner cycle={cycle} /> : null}
       <PageHeader
         title="Team"
         description={`${team.length} member${team.length === 1 ? "" : "s"}${

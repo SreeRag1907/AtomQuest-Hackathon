@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelative } from "@/lib/format/date";
 import { createClient } from "@/lib/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
@@ -96,7 +96,7 @@ export function AuditDrawer({ entityType, entityIds, trigger, title = "Audit his
                           )}
                         </div>
                         <div className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                          {formatDistanceToNow(new Date(row.created_at), { addSuffix: true })}
+                          {formatRelative(row.created_at)}
                           {row.reason && ` · ${row.reason}`}
                         </div>
                       </div>

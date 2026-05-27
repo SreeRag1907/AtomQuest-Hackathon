@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, ClipboardCheck } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelative } from "@/lib/format/date";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
@@ -16,26 +16,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { GoalSheet, Profile } from "@/types/database";
+import type { Cycle, GoalSheet, Profile } from "@/types/database";
 
 export default async function ApprovalsQueuePage() {
   const me = await requireRole(["manager", "admin"]);
   const supabase = await createClient();
 
-  const teamQuery = supabase.from("profiles").select("id");
+  // Approval queue is always scoped to employees (admins/managers don't approve
+  // their own peers' sheets here) and to the active cycle (so historical
+  // cycles don't pollute the queue).
+  const teamQuery = supabase.from("profiles").select("id").eq("role", "employee");
   const { data: team } =
     me.role === "admin"
       ? await teamQuery
       : await teamQuery.eq("manager_id", me.id);
 
+  const { data: activeCycle } = await supabase
+    .from("cycles")
+    .select("id")
+    .eq("is_active", true)
+    .maybeSingle<Pick<Cycle, "id">>();
+
   const teamIds = (team ?? []).map((t) => t.id);
   const { data: sheets } = teamIds.length
-    ? await supabase
-        .from("goal_sheets")
-        .select("*")
-        .eq("status", "submitted")
-        .in("employee_id", teamIds)
-        .order("submitted_at", { ascending: true })
+    ? await (() => {
+        let q = supabase
+          .from("goal_sheets")
+          .select("*")
+          .eq("status", "submitted")
+          .in("employee_id", teamIds)
+          .order("submitted_at", { ascending: true });
+        if (activeCycle) q = q.eq("cycle_id", activeCycle.id);
+        return q;
+      })()
     : { data: [] as GoalSheet[] };
 
   const empIds = (sheets ?? []).map((s) => s.employee_id);
@@ -97,7 +110,7 @@ export default async function ApprovalsQueuePage() {
                     <TableCell>
                       <div className="text-sm">
                         {s.submitted_at
-                          ? formatDistanceToNow(new Date(s.submitted_at), { addSuffix: true })
+                          ? formatRelative(s.submitted_at)
                           : "—"}
                       </div>
                       <div className="text-xs text-muted-foreground">

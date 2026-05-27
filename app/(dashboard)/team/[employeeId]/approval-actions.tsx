@@ -26,6 +26,7 @@ interface Props {
 export function ApprovalActions({ sheetId, employeeName }: Props) {
   const router = useRouter();
   const [returnOpen, setReturnOpen] = useState(false);
+  const [approveOpen, setApproveOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [isApproving, startApproving] = useTransition();
   const [isReturning, startReturning] = useTransition();
@@ -37,7 +38,8 @@ export function ApprovalActions({ sheetId, employeeName }: Props) {
         toast.error(r.error ?? "Failed");
         return;
       }
-      toast.success("Sheet approved and locked");
+      toast.success("Sheet approved");
+      setApproveOpen(false);
       router.refresh();
     });
   }
@@ -57,11 +59,11 @@ export function ApprovalActions({ sheetId, employeeName }: Props) {
 
   return (
     <>
-      <Card className="flex items-center justify-between gap-3 border-warning/40 bg-warning/5 p-4">
+      <Card className="flex flex-col items-start justify-between gap-3 border-warning/40 bg-warning/5 p-4 sm:flex-row sm:items-center">
         <div>
           <div className="text-sm font-medium">Awaiting your review</div>
           <p className="text-xs text-muted-foreground">
-            Approve to lock the sheet, or return it with a reason for rework.
+            Approve to finalize, or return with a reason so the employee can rework.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -72,12 +74,44 @@ export function ApprovalActions({ sheetId, employeeName }: Props) {
           >
             <Undo2 className="h-4 w-4" /> Return for rework
           </Button>
-          <Button onClick={handleApprove} disabled={isApproving || isReturning}>
-            {isApproving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-            Approve & lock
+          <Button onClick={() => setApproveOpen(true)} disabled={isApproving || isReturning}>
+            <Check className="h-4 w-4" />
+            Approve
           </Button>
         </div>
       </Card>
+
+      <Dialog
+        open={approveOpen}
+        onOpenChange={(open) => {
+          if (isApproving) return;
+          setApproveOpen(open);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve {employeeName}&apos;s goal sheet?</DialogTitle>
+            <DialogDescription>
+              Approval is required before this person can begin check-ins. The
+              sheet becomes read-only and weightages are frozen. The sheet will
+              auto-lock when the goal-setting phase closes.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setApproveOpen(false)}
+              disabled={isApproving}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleApprove} disabled={isApproving}>
+              {isApproving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
+              Yes, approve
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={returnOpen}

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelative } from "@/lib/format/date";
 import { Loader2, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -185,7 +185,7 @@ function QuarterPanel({
                 >
                   <p>{c.comment}</p>
                   <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-                    {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
+                    {formatRelative(c.created_at)}
                   </div>
                 </li>
               ))}

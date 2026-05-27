@@ -536,10 +536,32 @@ export async function sendCheckinReminder(employeeId: string): Promise<Result> {
       `${quarter}_closes` as "q1_closes" | "q2_closes" | "q3_closes" | "q4_closes"
     ];
 
+  // Cooldown: don't let a manager fire reminders more than once every 12 hours
+  // for the same employee + quarter. Stops accidental spam and keeps escalation
+  // signals meaningful.
+  const COOLDOWN_HOURS = 12;
+  const cutoff = new Date(Date.now() - COOLDOWN_HOURS * 60 * 60 * 1000).toISOString();
+  const reminderTitle = `${quarter.toUpperCase()} check-in reminder`;
+  const { data: recent } = await supabase
+    .from("notifications")
+    .select("created_at")
+    .eq("user_id", emp.id)
+    .eq("type", "checkin_reminder")
+    .eq("title", reminderTitle)
+    .gte("created_at", cutoff)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (recent && recent.length > 0) {
+    return {
+      ok: false,
+      error: `A reminder was already sent recently. Try again after ${COOLDOWN_HOURS}h.`,
+    };
+  }
+
   await supabase.from("notifications").insert({
     user_id: emp.id,
     type: "checkin_reminder",
-    title: `${quarter.toUpperCase()} check-in reminder`,
+    title: reminderTitle,
     message: `${me.full_name} sent you a check-in reminder.`,
     link: "/check-ins",
   });

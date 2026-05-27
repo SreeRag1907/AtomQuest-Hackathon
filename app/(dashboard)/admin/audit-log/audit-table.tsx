@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Papa from "papaparse";
 import { ChevronDown, ChevronRight, Download, Search } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelative } from "@/lib/format/date";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -48,7 +47,8 @@ export function AuditTable({ rows }: Props) {
     });
   }, [rows, entity, search]);
 
-  function exportCsv() {
+  async function exportCsv() {
+    const { default: Papa } = await import("papaparse");
     const csv = Papa.unparse(
       filtered.map((r) => ({
         timestamp: r.created_at,
@@ -134,7 +134,7 @@ export function AuditTable({ rows }: Props) {
                   <span className="text-xs text-muted-foreground">by {r.actor.full_name}</span>
                 )}
                 <span className="ml-auto text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
+                  {formatRelative(r.created_at)}
                 </span>
               </button>
               {expanded && <DiffView before={r.before_value} after={r.after_value} reason={r.reason} />}

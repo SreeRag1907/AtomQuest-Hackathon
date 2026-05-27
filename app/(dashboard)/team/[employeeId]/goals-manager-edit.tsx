@@ -60,7 +60,7 @@ export function GoalsManagerEdit({ sheetId, goals, thrustAreas }: Props) {
       thrust_area_id: g.thrust_area_id,
       target: g.target,
       target_date: g.target_date,
-      weightage: g.weightage,
+      weightage: g.weightage ?? 0,
       isChild: !!g.parent_goal_id,
       uom_type: g.uom_type,
       __dirty: false,

@@ -3,6 +3,8 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { Unlock } from "lucide-react";
+import { formatDateTime } from "@/lib/format/date";
+import { Badge } from "@/components/ui/badge";
 import { GoalStatusBadge } from "@/components/status-badge";
 import { DirectUnlock } from "./direct-unlock";
 import { RequestActions } from "./request-actions";
@@ -66,6 +68,46 @@ export default async function UnlockRequestsPage() {
                         <div className="mt-0.5 text-xs text-muted-foreground">{r.reason}</div>
                       </div>
                       <RequestActions requestId={r.id} />
+                    </li>
+                  );
+                })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-3 p-5">
+          <div className="text-sm font-semibold">Decision history</div>
+          <p className="text-xs text-muted-foreground">
+            Approved and rejected requests stay here for audit reference.
+          </p>
+          {(requests ?? []).filter((r) => r.status !== "pending").length === 0 ? (
+            <p className="text-sm text-muted-foreground">No decisions yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {(requests ?? [])
+                .filter((r) => r.status !== "pending")
+                .slice(0, 20)
+                .map((r: UnlockRequest) => {
+                  const requester = profileById.get(r.requested_by);
+                  return (
+                    <li
+                      key={r.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm"
+                    >
+                      <div>
+                        <div className="font-medium">{requester?.full_name ?? "Unknown"}</div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">{r.reason}</div>
+                        {r.reviewed_at ? (
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">
+                            Decided {formatDateTime(r.reviewed_at)}
+                          </div>
+                        ) : null}
+                      </div>
+                      <Badge variant={r.status === "approved" ? "success" : "muted"}>
+                        {r.status}
+                      </Badge>
                     </li>
                   );
                 })}

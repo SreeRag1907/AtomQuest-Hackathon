@@ -2,12 +2,22 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
+import { formatDateTime } from "@/lib/format/date";
 import { Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -98,7 +108,7 @@ export function EscalationLogTable({ rows, employees, ruleNameById }: Props) {
               return (
                 <TableRow key={r.id}>
                   <TableCell className="text-xs text-muted-foreground tabular-nums">
-                    {format(new Date(r.fired_at), "dd MMM, HH:mm")}
+                    {formatDateTime(r.fired_at)}
                   </TableCell>
                   <TableCell className="font-medium">
                     {emp?.full_name ?? "Unknown"}
@@ -133,31 +143,72 @@ export function EscalationLogTable({ rows, employees, ruleNameById }: Props) {
 
 function ResolveButton({ logId }: { logId: string }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  function submit() {
+    startTransition(async () => {
+      const r = await resolveEscalation(logId, note);
+      if (!r.ok) {
+        toast.error(r.error ?? "Failed");
+        return;
+      }
+      toast.success("Marked resolved");
+      setOpen(false);
+      setNote("");
+      router.refresh();
+    });
+  }
+
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      disabled={isPending}
-      onClick={() => {
-        const note = prompt("Resolution note (optional):");
-        if (note === null) return;
-        startTransition(async () => {
-          const r = await resolveEscalation(logId, note);
-          if (!r.ok) toast.error(r.error ?? "Failed");
-          else {
-            toast.success("Marked resolved");
-            router.refresh();
-          }
-        });
-      }}
-    >
-      {isPending ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-      ) : (
-        <Check className="h-3.5 w-3.5" />
-      )}
-      Resolve
-    </Button>
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={isPending}
+        onClick={() => setOpen(true)}
+      >
+        {isPending ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Check className="h-3.5 w-3.5" />
+        )}
+        Resolve
+      </Button>
+
+      <Dialog open={open} onOpenChange={(o) => !isPending && setOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resolve escalation</DialogTitle>
+            <DialogDescription>
+              Optional note explaining how this was addressed. Stored on the log
+              row for audit.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor={`resolve-note-${logId}`}>Resolution note</Label>
+            <Textarea
+              id={`resolve-note-${logId}`}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={4}
+              placeholder="e.g. Spoke with manager; goals submitted today."
+              maxLength={500}
+            />
+            <p className="text-right text-[10px] text-muted-foreground">{note.length}/500</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
+              Cancel
+            </Button>
+            <Button onClick={submit} disabled={isPending}>
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
+              Mark resolved
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

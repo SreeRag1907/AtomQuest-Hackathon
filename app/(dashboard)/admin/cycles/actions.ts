@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { phaseLabel } from "@/lib/cycle";
 import type { CyclePhase } from "@/types/database";
 
 interface Result {
@@ -120,6 +121,18 @@ export async function setPhase(cycleId: string, phase: CyclePhase): Promise<Resu
     .eq("id", cycleId);
   if (error) return { ok: false, error: error.message };
 
+  // When goal-setting closes (transition to a quarter or to closed), lock all
+  // approved sheets in this cycle so goals become immutable for the rest of
+  // the year. Approved sheets keep their existing approval metadata.
+  if (phase !== "goal_setting" && phase !== "not_started") {
+    const now = new Date().toISOString();
+    await supabase
+      .from("goal_sheets")
+      .update({ status: "locked", locked_at: now })
+      .eq("cycle_id", cycleId)
+      .eq("status", "approved");
+  }
+
   // Notify all users (best effort)
   const { data: users } = await supabase.from("profiles").select("id");
   if (users) {
@@ -127,7 +140,7 @@ export async function setPhase(cycleId: string, phase: CyclePhase): Promise<Resu
       user_id: u.id,
       type: "cycle_phase",
       title: `Cycle phase changed`,
-      message: `Now in ${phase.replace("_", " ")}`,
+      message: `Now in ${phaseLabel(phase)}`,
       link: "/dashboard",
     }));
     await supabase.from("notifications").insert(rows);

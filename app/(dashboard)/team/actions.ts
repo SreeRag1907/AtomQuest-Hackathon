@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { replaceGoals, type GoalDraftInput } from "@/app/(dashboard)/goals/actions";
-import { isGoalSettingPhase } from "@/lib/cycle";
+import { isGoalSettingWindowOpen } from "@/lib/cycle";
 import { sendEmail } from "@/lib/email";
 import { goalApprovedEmail, goalReturnedEmail } from "@/lib/email/templates";
 import { sendTeamsCard } from "@/lib/teams";
@@ -67,7 +67,9 @@ export async function managerCreateGoalSheetForEmployee(
 
   const cycle = await getActiveCycle();
   if (!cycle) return { ok: false, error: "No active cycle" };
-  if (!isGoalSettingPhase(cycle.current_phase)) {
+  // Match the employee-side date-aware check so manager and employee see the
+  // same "window open" state across both flows.
+  if (!isGoalSettingWindowOpen(cycle)) {
     return { ok: false, error: "Goal-setting window is closed for this cycle." };
   }
 
@@ -164,14 +166,35 @@ export async function approveGoalSheet(sheetId: string): Promise<Result> {
     return { ok: false, error: "Only submitted sheets can be approved" };
   }
 
+  // Sanity check before approval: weightages must sum to 100. Sheet shouldn't
+  // be approvable if weightages were left invalid (defends against direct API
+  // submits that bypassed the client checks).
+  const { data: sheetGoals } = await supabase
+    .from("goals")
+    .select("weightage")
+    .eq("goal_sheet_id", sheetId);
+  const total = (sheetGoals ?? []).reduce(
+    (sum, g) => sum + ((g.weightage ?? 0) as number),
+    0
+  );
+  if (total !== 100) {
+    return {
+      ok: false,
+      error: `Goal weightages sum to ${total}% — must equal 100%. Return for rework or use inline edit.`,
+    };
+  }
+
   const now = new Date().toISOString();
+  // Approve transitions: submitted → approved. The sheet becomes read-only for
+  // the employee (RLS) and check-ins become available. A separate (cycle phase
+  // advance or admin) action transitions approved → locked when goal-setting
+  // closes for the cycle.
   const { error } = await supabase
     .from("goal_sheets")
     .update({
-      status: "locked",
+      status: "approved",
       approved_at: now,
       approved_by: auth.me.id,
-      locked_at: now,
       return_reason: null,
     })
     .eq("id", sheetId);

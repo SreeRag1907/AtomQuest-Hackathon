@@ -3,15 +3,13 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
-import { isGoalSettingPhase, phaseLabel } from "@/lib/cycle";
+import { isGoalSettingWindowOpen, phaseLabel } from "@/lib/cycle";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { GoalSheetForm } from "@/components/goals/goal-sheet-form";
-import {
-  managerCreateGoalSheetForEmployee,
-  managerSaveEmployeeDraft,
-} from "@/app/(dashboard)/team/actions";
+import { managerSaveEmployeeDraft } from "@/app/(dashboard)/team/actions";
+import { StartAssignButton } from "./start-assign-button";
 import type { Cycle, Goal, GoalSheet, Profile, ThrustArea } from "@/types/database";
 
 export default async function ManagerAssignGoalsPage({
@@ -52,14 +50,14 @@ export default async function ManagerAssignGoalsPage({
     );
   }
 
-  if (!isGoalSettingPhase(cycle.current_phase)) {
+  if (!isGoalSettingWindowOpen(cycle)) {
     return (
       <div className="space-y-6">
         <PageHeader title={`Assign goals — ${employee.full_name}`} />
         <EmptyState
           icon={Lock}
           title="Goal-setting is closed"
-          description={`The cycle is in ${phaseLabel(cycle.current_phase)}. Goals can only be assigned during the goal-setting phase.`}
+          description={`The cycle is in ${phaseLabel(cycle.current_phase)}. Goals can only be assigned during the goal-setting window.`}
           action={
             <Button asChild variant="outline">
               <Link href={`/team/${employeeId}`}>Back to profile</Link>
@@ -70,33 +68,19 @@ export default async function ManagerAssignGoalsPage({
     );
   }
 
-  const created = await managerCreateGoalSheetForEmployee(employeeId);
-  if (!created.ok || !created.sheetId) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title={`Assign goals — ${employee.full_name}`} />
-        <EmptyState
-          icon={Lock}
-          title="Cannot open assign flow"
-          description={created.error ?? "Unknown error"}
-          action={
-            <Button asChild variant="outline">
-              <Link href={`/team/${employeeId}`}>Back to profile</Link>
-            </Button>
-          }
-        />
-      </div>
-    );
-  }
-
-  const sheetId = created.sheetId;
-  const { data: sheet } = await supabase
+  // Look up any existing draft/returned sheet but do NOT create one on a bare
+  // GET. The "Start assigning" button below explicitly creates it.
+  const { data: existingSheet } = await supabase
     .from("goal_sheets")
     .select("*")
-    .eq("id", sheetId)
-    .single<GoalSheet>();
+    .eq("employee_id", employeeId)
+    .eq("cycle_id", cycle.id)
+    .maybeSingle<GoalSheet>();
 
-  if (!sheet || !["draft", "returned"].includes(sheet.status)) {
+  const editable =
+    existingSheet && ["draft", "returned"].includes(existingSheet.status);
+
+  if (existingSheet && !editable) {
     return (
       <div className="space-y-6">
         <PageHeader title={`Assign goals — ${employee.full_name}`} />
@@ -114,17 +98,43 @@ export default async function ManagerAssignGoalsPage({
     );
   }
 
-  const { data: goals } = await supabase
-    .from("goals")
-    .select("*")
-    .eq("goal_sheet_id", sheetId)
-    .order("display_order");
-
   const { data: thrustAreas } = await supabase
     .from("thrust_areas")
     .select("*")
     .eq("is_active", true)
     .order("name");
+
+  if (!existingSheet) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title={`Assign goals — ${employee.full_name}`}
+          description={`${cycle.name} · No sheet yet for this cycle.`}
+          actions={
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/team/${employeeId}`}>
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                Back to profile
+              </Link>
+            </Button>
+          }
+        />
+        <EmptyState
+          icon={Lock}
+          title="Ready to assign"
+          description="Create a draft sheet for this employee, then add their goals. They will submit for your approval from My goals."
+          action={<StartAssignButton employeeId={employeeId} />}
+        />
+      </div>
+    );
+  }
+
+  const sheetId = existingSheet.id;
+  const { data: goals } = await supabase
+    .from("goals")
+    .select("*")
+    .eq("goal_sheet_id", sheetId)
+    .order("display_order");
 
   return (
     <div className="space-y-6">
@@ -145,8 +155,8 @@ export default async function ManagerAssignGoalsPage({
         sheetId={sheetId}
         initialGoals={(goals ?? []) as Goal[]}
         thrustAreas={(thrustAreas ?? []) as ThrustArea[]}
-        isReturned={sheet.status === "returned"}
-        returnReason={sheet.return_reason}
+        isReturned={existingSheet.status === "returned"}
+        returnReason={existingSheet.return_reason}
         canShare={false}
         saveDraftAction={managerSaveEmployeeDraft}
         hideSubmit

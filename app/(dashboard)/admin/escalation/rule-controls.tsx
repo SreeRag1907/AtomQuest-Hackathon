@@ -217,27 +217,52 @@ export function RuleToggle({ rule }: { rule: EscalationRule }) {
 
 export function RuleDeleteButton({ rule }: { rule: EscalationRule }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  function submit() {
+    startTransition(async () => {
+      const r = await deleteRule(rule.id);
+      if (!r.ok) {
+        toast.error(r.error ?? "Failed");
+        return;
+      }
+      toast.success("Rule deleted");
+      setOpen(false);
+      router.refresh();
+    });
+  }
+
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      disabled={isPending}
-      onClick={() => {
-        if (!confirm(`Delete "${rule.name}"? Logged escalations will keep their history.`)) {
-          return;
-        }
-        startTransition(async () => {
-          const r = await deleteRule(rule.id);
-          if (!r.ok) toast.error(r.error ?? "Failed");
-          else {
-            toast.success("Rule deleted");
-            router.refresh();
-          }
-        });
-      }}
-    >
-      Delete
-    </Button>
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={isPending}
+        onClick={() => setOpen(true)}
+      >
+        Delete
+      </Button>
+      <Dialog open={open} onOpenChange={(o) => !isPending && setOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete &ldquo;{rule.name}&rdquo;?</DialogTitle>
+            <DialogDescription>
+              Logged escalations triggered by this rule keep their history. The
+              rule will stop firing immediately.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={submit} disabled={isPending}>
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
+              Yes, delete rule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

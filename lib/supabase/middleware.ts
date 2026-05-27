@@ -2,7 +2,13 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { AuthError } from "@supabase/supabase-js";
 
-const PUBLIC_ROUTES = new Set(["/login", "/signup", "/auth/callback", "/auth/error"]);
+const PUBLIC_ROUTES = new Set([
+  "/login",
+  "/signup",
+  "/auth/callback",
+  "/auth/error",
+  "/update-password",
+]);
 
 /** Clear Supabase auth cookies when refresh fails (wrong project URL, revoked user, wiped DB). */
 function clearStaleSupabaseCookies(req: NextRequest, res: NextResponse): void {
@@ -86,6 +92,27 @@ export async function updateSession(request: NextRequest) {
     redirectUrl.pathname = "/dashboard";
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
+  }
+
+  // Block deactivated users before any protected route renders.
+  // Cheap follow-up read; skipped on public routes and stale sessions.
+  if (effectiveUser && !isPublic) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_active")
+      .eq("id", effectiveUser.id)
+      .maybeSingle<{ is_active: boolean }>();
+
+    if (profile && profile.is_active === false) {
+      await supabase.auth.signOut();
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/auth/error";
+      redirectUrl.search = "";
+      redirectUrl.searchParams.set("code", "deactivated");
+      const res = NextResponse.redirect(redirectUrl);
+      clearStaleSupabaseCookies(request, res);
+      return res;
+    }
   }
 
   return supabaseResponse;

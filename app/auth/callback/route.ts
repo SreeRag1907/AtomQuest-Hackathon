@@ -12,7 +12,10 @@ import type { Profile } from "@/types/database";
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") ?? "/dashboard";
+  const nextRaw = url.searchParams.get("next") ?? "/dashboard";
+  // Open-redirect guard: only honor internal paths.
+  const next =
+    nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/dashboard";
   const errorParam =
     url.searchParams.get("error_description") ?? url.searchParams.get("error");
 
@@ -25,57 +28,73 @@ export async function GET(request: NextRequest) {
   }
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login`);
+    return NextResponse.redirect(`${origin}/login?oauth_error=no_code`);
   }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
     return NextResponse.redirect(
-      `${origin}/login?oauth_error=${encodeURIComponent(error.message)}`
+      `${origin}/login?oauth_error=exchange_failed`
     );
   }
 
   // Sync Entra claims into profiles — role, department, optional reporting-line (manager).
+  let profileSyncFailed = false;
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (user) {
-    const metadata = coerceEntraMetadata(user.user_metadata);
+    try {
+      const metadata = coerceEntraMetadata(user.user_metadata);
 
-    const { data: existing } = await supabase
-      .from("profiles")
-      .select("email, full_name, department, role, manager_id")
-      .eq("id", user.id)
-      .maybeSingle<
-        Pick<Profile, "email" | "full_name" | "department" | "role" | "manager_id">
-      >();
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("email, full_name, department, role, manager_id")
+        .eq("id", user.id)
+        .maybeSingle<
+          Pick<Profile, "email" | "full_name" | "department" | "role" | "manager_id">
+        >();
 
-    const patch = buildProfileFromEntra(metadata, existing);
+      const patch = buildProfileFromEntra(metadata, existing);
 
-    const manager_id = await lookupManagerProfileId(supabase, patch.manager_lookup);
+      const manager_id = await lookupManagerProfileId(supabase, patch.manager_lookup);
 
-    if (existing) {
-      const payload: Record<string, unknown> = {
-        full_name: patch.full_name,
-        department: patch.department,
-        role: patch.role,
-      };
-      /** Only overwrite reporting line when Entra sends a manager key we resolve */
-      if (patch.manager_lookup && manager_id) payload.manager_id = manager_id;
+      if (existing) {
+        const payload: Record<string, unknown> = {
+          full_name: patch.full_name,
+          department: patch.department,
+          role: patch.role,
+        };
+        /** Only overwrite reporting line when Entra sends a manager key we resolve */
+        if (patch.manager_lookup && manager_id) payload.manager_id = manager_id;
 
-      await supabase.from("profiles").update(payload).eq("id", user.id);
-    } else {
-      await supabase.from("profiles").insert({
-        id: user.id,
-        email: patch.email,
-        full_name: patch.full_name,
-        department: patch.department,
-        role: patch.role,
-        manager_id,
-        is_active: true,
-      });
+        const { error: upErr } = await supabase
+          .from("profiles")
+          .update(payload)
+          .eq("id", user.id);
+        if (upErr) profileSyncFailed = true;
+      } else {
+        const { error: insErr } = await supabase.from("profiles").insert({
+          id: user.id,
+          email: patch.email,
+          full_name: patch.full_name,
+          department: patch.department,
+          role: patch.role,
+          manager_id,
+          is_active: true,
+        });
+        if (insErr) profileSyncFailed = true;
+      }
+    } catch {
+      profileSyncFailed = true;
     }
+  }
+
+  if (profileSyncFailed) {
+    return NextResponse.redirect(
+      `${origin}/login?oauth_error=profile_sync_failed`
+    );
   }
 
   return NextResponse.redirect(`${origin}${next}`);

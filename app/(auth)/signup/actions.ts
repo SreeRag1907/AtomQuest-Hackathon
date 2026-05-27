@@ -1,19 +1,17 @@
 "use server";
 
 import { createServiceClient } from "@/lib/supabase/server";
-import type { UserRole } from "@/types/database";
-
-const ROLES: UserRole[] = ["employee", "manager", "admin"];
 
 function devBypass(): boolean {
   return process.env.AUTH_DEV_CREATE_USER_WITHOUT_EMAIL === "true";
 }
 
+// Self-service signup always provisions an employee. Manager/Admin roles are
+// granted from the admin Users console.
 export async function signUpWithoutAuthEmail(
   email: string,
   password: string,
   fullName: string,
-  role: string,
   department: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!devBypass()) {
@@ -30,9 +28,6 @@ export async function signUpWithoutAuthEmail(
   if (password.length < 8) {
     return { ok: false, error: "Password must be at least 8 characters" };
   }
-  if (!ROLES.includes(role as UserRole)) {
-    return { ok: false, error: "Invalid role" };
-  }
   const dept = department.trim();
   const supabase = await createServiceClient();
   const { error } = await supabase.auth.admin.createUser({
@@ -41,8 +36,9 @@ export async function signUpWithoutAuthEmail(
     email_confirm: true,
     user_metadata: {
       full_name: name,
-      role: role as UserRole,
+      role: "employee" as const,
       ...(dept ? { department: dept } : {}),
+      _provisioned: true,
     },
   });
   if (error) return { ok: false, error: error.message };

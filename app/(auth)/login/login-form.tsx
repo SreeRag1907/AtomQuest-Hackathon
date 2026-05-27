@@ -99,11 +99,18 @@ export function LoginForm() {
   function signInWithMicrosoft() {
     startTransition(async () => {
       const supabase = createClient();
+      // Preserve any deep-link the user was trying to reach so the OAuth
+      // callback can land them where they intended.
+      const rawFrom = searchParams?.get("from") ?? "";
+      const safeFrom =
+        rawFrom.startsWith("/") && !rawFrom.startsWith("//") ? rawFrom : "";
+      const callbackUrl = new URL(`${window.location.origin}/auth/callback`);
+      if (safeFrom) callbackUrl.searchParams.set("next", safeFrom);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "azure",
         options: {
           scopes: "email openid profile offline_access",
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl.toString(),
         },
       });
       if (error) toast.error(error.message);
@@ -112,13 +119,32 @@ export function LoginForm() {
 
   // A `from` param means middleware redirected the user here — either their
   // session expired or they tried to access a protected route while signed out.
-  const redirectedFrom = searchParams.get("from") ?? "";
+  const redirectedFrom = searchParams?.get("from") ?? "";
   // Only show the banner when a legitimate internal path triggered the redirect
   const showSessionBanner =
     redirectedFrom.startsWith("/") && !redirectedFrom.startsWith("//") && redirectedFrom !== "/";
 
+  // Surface OAuth callback errors set via /auth/callback ?oauth_error=...
+  const oauthError = searchParams?.get("oauth_error") ?? "";
+  const OAUTH_ERROR_LABELS: Record<string, string> = {
+    no_code: "Sign-in was cancelled or interrupted. Please try again.",
+    exchange_failed: "We couldn't complete sign-in with Microsoft. Please try again.",
+    profile_sync_failed: "Signed in, but couldn't sync your profile. Try signing in again or contact support.",
+  };
+  const oauthErrorMessage =
+    oauthError && (OAUTH_ERROR_LABELS[oauthError] ?? "Sign-in failed. Please try again.");
+
   return (
     <div className="space-y-6">
+      {oauthErrorMessage && (
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <span>{oauthErrorMessage}</span>
+        </div>
+      )}
       {showSessionBanner && (
         <div className="flex items-start gap-2.5 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -171,11 +197,15 @@ export function LoginForm() {
             />
             <button
               type="button"
+              aria-label={showPassword ? "Hide password" : "Show password"}
               onClick={() => setShowPassword((v) => !v)}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              tabIndex={-1}
             >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showPassword ? (
+                <EyeOff className="h-4 w-4" aria-hidden />
+              ) : (
+                <Eye className="h-4 w-4" aria-hidden />
+              )}
             </button>
           </div>
         </div>

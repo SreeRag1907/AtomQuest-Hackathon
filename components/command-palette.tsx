@@ -2,22 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  BarChart3,
-  CheckSquare,
-  Clipboard,
-  ClipboardList,
-  FileText,
-  History as HistoryIcon,
-  Home,
-  Sparkles,
-  Tag,
-  Unlock,
-  Users,
-  Users2,
-  ScrollText,
-  Settings,
-} from "lucide-react";
+import { History as HistoryIcon } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -27,62 +12,23 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
+import { NAV_SECTIONS, PALETTE_ACTIONS, type NavItem } from "@/lib/navigation";
 import type { UserRole } from "@/types/database";
-
-interface PaletteItem {
-  href: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  group: string;
-  roles?: UserRole[];
-}
-
-const ITEMS: PaletteItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: Home, group: "Navigate" },
-  {
-    href: "/goals",
-    label: "My goals",
-    icon: Clipboard,
-    group: "Navigate",
-    roles: ["employee", "manager"],
-  },
-  {
-    href: "/goals/new",
-    label: "Create goal sheet",
-    icon: Clipboard,
-    group: "Actions",
-    roles: ["employee", "manager"],
-  },
-  {
-    href: "/check-ins",
-    label: "Current check-in",
-    icon: CheckSquare,
-    group: "Navigate",
-    roles: ["employee", "manager"],
-  },
-  {
-    href: "/check-ins/history",
-    label: "Check-in history",
-    icon: HistoryIcon,
-    group: "Navigate",
-    roles: ["employee", "manager"],
-  },
-  { href: "/team", label: "Team", icon: Users, group: "Manager", roles: ["manager", "admin"] },
-  { href: "/team/approvals", label: "Approvals queue", icon: ClipboardList, group: "Manager", roles: ["manager", "admin"] },
-  { href: "/reports/achievement", label: "Achievement report", icon: FileText, group: "Reports" },
-  { href: "/reports/completion", label: "Completion report", icon: BarChart3, group: "Reports" },
-  { href: "/analytics", label: "Analytics", icon: Sparkles, group: "Reports" },
-  { href: "/admin/cycles", label: "Cycles", icon: HistoryIcon, group: "Admin", roles: ["admin"] },
-  { href: "/admin/users", label: "Users", icon: Users2, group: "Admin", roles: ["admin"] },
-  { href: "/admin/thrust-areas", label: "Thrust areas", icon: Tag, group: "Admin", roles: ["admin"] },
-  { href: "/admin/audit-log", label: "Audit log", icon: ScrollText, group: "Admin", roles: ["admin"] },
-  { href: "/admin/unlock-requests", label: "Unlock requests", icon: Unlock, group: "Admin", roles: ["admin"] },
-  { href: "/settings", label: "Settings", icon: Settings, group: "Account" },
-];
 
 interface Props {
   role: UserRole;
 }
+
+// Extra navigate-only commands beyond the sidebar (deep links)
+const EXTRA_NAV: NavItem[] = [
+  {
+    href: "/check-ins/history",
+    label: "Check-in history",
+    icon: HistoryIcon,
+    roles: ["employee", "manager"],
+    paletteGroup: "Navigate",
+  },
+];
 
 export function CommandPalette({ role }: Props) {
   const router = useRouter();
@@ -99,8 +45,16 @@ export function CommandPalette({ role }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  const visible = ITEMS.filter((i) => !i.roles || i.roles.includes(role));
-  const groups = Array.from(new Set(visible.map((i) => i.group)));
+  const allItems: NavItem[] = [
+    ...NAV_SECTIONS.flatMap((s) => s.items),
+    ...EXTRA_NAV,
+    ...PALETTE_ACTIONS,
+  ];
+
+  const visible = allItems.filter((i) => !i.roles || i.roles.includes(role));
+  const groups = Array.from(
+    new Set(visible.map((i) => i.paletteGroup ?? "Navigate"))
+  );
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
@@ -111,7 +65,7 @@ export function CommandPalette({ role }: Props) {
           <span key={g}>
             <CommandGroup heading={g}>
               {visible
-                .filter((i) => i.group === g)
+                .filter((i) => (i.paletteGroup ?? "Navigate") === g)
                 .map((i) => {
                   const Icon = i.icon;
                   return (
@@ -122,7 +76,7 @@ export function CommandPalette({ role }: Props) {
                         router.push(i.href);
                       }}
                     >
-                      <Icon className="mr-2 h-4 w-4" />
+                      <Icon className="mr-2 h-4 w-4" aria-hidden />
                       {i.label}
                     </CommandItem>
                   );

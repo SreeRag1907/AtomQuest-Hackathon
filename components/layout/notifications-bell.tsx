@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Bell, CheckCheck } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelative } from "@/lib/format/date";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -126,7 +126,7 @@ export function NotificationsBell({ userId }: Props) {
                 const inner = (
                   <div
                     className={cn(
-                      "flex items-start gap-3 px-3 py-2.5 transition-colors hover:bg-accent",
+                      "flex items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent",
                       !n.is_read && "bg-primary/5"
                     )}
                   >
@@ -135,6 +135,7 @@ export function NotificationsBell({ userId }: Props) {
                         "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
                         n.is_read ? "bg-transparent" : "bg-primary"
                       )}
+                      aria-hidden
                     />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">{n.title}</div>
@@ -142,19 +143,32 @@ export function NotificationsBell({ userId }: Props) {
                         <div className="text-xs text-muted-foreground">{n.message}</div>
                       )}
                       <div className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                        {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                        {formatRelative(n.created_at)}
                       </div>
                     </div>
                   </div>
                 );
                 return (
-                  <li key={n.id} onClick={() => !n.is_read && markRead(n.id)}>
+                  <li key={n.id}>
                     {n.link ? (
-                      <Link href={n.link} onClick={() => setOpen(false)} className="block">
+                      <Link
+                        href={n.link}
+                        onClick={() => {
+                          if (!n.is_read) markRead(n.id);
+                          setOpen(false);
+                        }}
+                        className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                      >
                         {inner}
                       </Link>
                     ) : (
-                      inner
+                      <button
+                        type="button"
+                        onClick={() => !n.is_read && markRead(n.id)}
+                        className="block w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                      >
+                        {inner}
+                      </button>
                     )}
                   </li>
                 );

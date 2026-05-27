@@ -12,17 +12,22 @@ const LABELS: Record<string, string> = {
   history: "History",
   team: "Team",
   approvals: "Approvals",
+  "assign-goals": "Assign goals",
   admin: "Admin",
   cycles: "Cycles",
   users: "Users",
   "thrust-areas": "Thrust areas",
   "audit-log": "Audit log",
   "unlock-requests": "Unlock requests",
+  escalation: "Escalation",
   reports: "Reports",
   achievement: "Achievement",
   completion: "Completion",
   analytics: "Analytics",
   settings: "Settings",
+  "update-password": "Update password",
+  auth: "Sign-in",
+  error: "Error",
 };
 
 function pretty(seg: string) {

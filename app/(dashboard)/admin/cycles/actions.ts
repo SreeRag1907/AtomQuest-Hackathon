@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { revalidateActiveCycle } from "@/lib/data/active-cycle";
 import { createClient } from "@/lib/supabase/server";
 import { phaseLabel } from "@/lib/cycle";
 import type { CyclePhase } from "@/types/database";
@@ -107,7 +106,6 @@ export async function activateCycle(cycleId: string): Promise<Result> {
     .update({ is_active: true })
     .eq("id", cycleId);
   if (error) return { ok: false, error: error.message };
-  revalidateActiveCycle();
   revalidatePath("/admin/cycles");
   return { ok: true };
 }
@@ -148,7 +146,6 @@ export async function setPhase(cycleId: string, phase: CyclePhase): Promise<Resu
     await supabase.from("notifications").insert(rows);
   }
 
-  revalidateActiveCycle();
   revalidatePath("/admin/cycles");
   revalidatePath("/dashboard");
   revalidatePath("/goals");

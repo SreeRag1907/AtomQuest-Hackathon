@@ -105,12 +105,32 @@ export default async function AnalyticsPage() {
     }, {})
   ).map(([k, v]) => ({ name: UOM_LABELS[k as keyof typeof UOM_LABELS] ?? k, value: v }));
 
+  const employees = profiles.filter((p) => p.role === "employee");
+  const deptOrder = ["Engineering", "Sales", "Customer Success"];
   const departments = Array.from(
-    new Set(profiles.map((p) => p.department).filter(Boolean) as string[])
-  );
+    new Set(employees.map((p) => p.department).filter(Boolean) as string[])
+  ).sort((a, b) => {
+    const ai = deptOrder.indexOf(a);
+    const bi = deptOrder.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+
+  const deptChartLabel = (d: string) =>
+    d === "Customer Success" ? "Cust. Success" : d;
+
   const statusByDept = departments.map((d) => {
-    const counts = { department: d, draft: 0, submitted: 0, approved: 0, locked: 0, returned: 0 };
-    profiles
+    const counts = {
+      department: deptChartLabel(d),
+      draft: 0,
+      submitted: 0,
+      approved: 0,
+      locked: 0,
+      returned: 0,
+    };
+    employees
       .filter((p) => p.department === d)
       .forEach((p) => {
         const s = sheetByEmpId.get(p.id);
@@ -126,7 +146,7 @@ export default async function AnalyticsPage() {
   const heatmap = departments.map((d) => {
     const cells = QUARTERS.map((q) => {
       const scores: number[] = [];
-      profiles
+      employees
         .filter((p) => p.department === d)
         .forEach((p) => {
           const s = sheetByEmpId.get(p.id);
@@ -266,27 +286,28 @@ export default async function AnalyticsPage() {
           Goal distribution
         </h2>
         <div className="grid gap-4 lg:grid-cols-3">
-          <Card>
-            <CardHeader>
+          <Card className="flex flex-col">
+            <CardHeader className="pb-2">
               <CardTitle className="text-base">By thrust area</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 pb-5">
               <Donut data={thrustDist} />
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
+          <Card className="flex flex-col">
+            <CardHeader className="pb-2">
               <CardTitle className="text-base">By UoM type</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 pb-5">
               <UomBars data={uomDist} />
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
+          <Card className="flex flex-col lg:col-span-1">
+            <CardHeader className="pb-2">
               <CardTitle className="text-base">Status by department</CardTitle>
+              <p className="text-xs text-muted-foreground">Employees only · active cycle</p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 pb-5">
               <StackedStatus data={statusByDept} />
             </CardContent>
           </Card>

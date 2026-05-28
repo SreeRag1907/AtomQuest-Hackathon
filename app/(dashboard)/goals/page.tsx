@@ -146,7 +146,7 @@ export default async function GoalsListPage() {
                   </Button>
                 )}
                 <Button asChild variant="outline" size="sm">
-                  <Link href={`/goals/${sheet.id}`}>
+                  <Link href={`/goals/${sheet.id}`} prefetch={false}>
                     <FileEdit className="h-4 w-4" />
                     {["draft", "returned"].includes(sheet.status)
                       ? "Continue editing"
@@ -190,7 +190,7 @@ export default async function GoalsListPage() {
               action={
                 ["draft", "returned"].includes(sheet.status) ? (
                   <Button asChild size="sm">
-                    <Link href={`/goals/${sheet.id}`}>
+                    <Link href={`/goals/${sheet.id}`} prefetch={false}>
                       <Plus className="h-4 w-4" /> Add goals
                     </Link>
                   </Button>

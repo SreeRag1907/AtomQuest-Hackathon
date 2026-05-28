@@ -124,7 +124,7 @@ export default async function ApprovalsQueuePage() {
                     </TableCell>
                     <TableCell>
                       <Button asChild size="sm">
-                        <Link href={`/team/${s.employee_id}`}>
+                        <Link href={`/team/${s.employee_id}`} prefetch={false}>
                           Review <ArrowRight className="ml-1 h-3 w-3" />
                         </Link>
                       </Button>

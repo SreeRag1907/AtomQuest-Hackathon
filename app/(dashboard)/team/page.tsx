@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveCycle } from "@/lib/data/active-cycle";
+import { fetchGoalSheetBundle } from "@/lib/data/sheet-bundle";
 import { requireRole } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { CycleBanner } from "@/components/cycle-banner";
@@ -26,47 +28,29 @@ export default async function TeamPage() {
   const me = await requireRole(["manager", "admin"]);
   const supabase = await createClient();
 
-  const { data: cycle } = await supabase
-    .from("cycles")
-    .select("*")
-    .eq("is_active", true)
-    .maybeSingle<Cycle>();
-
-  // Active employees only — deactivated team members shouldn't clutter the roster.
   const teamQuery = supabase
     .from("profiles")
     .select("*")
     .eq("is_active", true)
     .order("full_name");
-  const { data: team } =
+
+  const [cycle, { data: team }] = await Promise.all([
+    getActiveCycle(),
     me.role === "admin"
-      ? await teamQuery.eq("role", "employee")
-      : await teamQuery.eq("manager_id", me.id);
+      ? teamQuery.eq("role", "employee")
+      : teamQuery.eq("manager_id", me.id),
+  ]);
 
-  const teamIds = (team ?? []).map((t) => t.id);
-  const { data: sheets } =
-    cycle && teamIds.length
-      ? await supabase
-          .from("goal_sheets")
-          .select("*")
-          .eq("cycle_id", cycle.id)
-          .in("employee_id", teamIds)
-      : { data: [] as GoalSheet[] };
-
-  const sheetIds = (sheets ?? []).map((s) => s.id);
-  const { data: goals } = sheetIds.length
-    ? await supabase.from("goals").select("*").in("goal_sheet_id", sheetIds)
-    : { data: [] as Goal[] };
-  const goalIds = (goals ?? []).map((g) => g.id);
+  const teamIds = new Set((team ?? []).map((t) => t.id));
+  const bundle = await fetchGoalSheetBundle(supabase, cycle?.id);
+  const sheets = bundle.sheets.filter((s) => teamIds.has(s.employee_id));
+  const goals = bundle.goals.filter((g) => sheets.some((s) => s.id === g.goal_sheet_id));
   const quarter = cycle ? quarterFromPhase(cycle.current_phase) : null;
-  const { data: achievements } =
-    goalIds.length && quarter
-      ? await supabase
-          .from("achievements")
-          .select("*")
-          .in("goal_id", goalIds)
-          .eq("quarter", quarter)
-      : { data: [] as Achievement[] };
+  const achievements = quarter
+    ? bundle.achievements.filter(
+        (a) => a.quarter === quarter && goals.some((g) => g.id === a.goal_id)
+      )
+    : [];
 
   const pendingCount = (sheets ?? []).filter((s) => s.status === "submitted").length;
 
@@ -161,7 +145,9 @@ export default async function TeamPage() {
                   </div>
                 )}
                 <Button asChild variant="outline" size="sm" className="w-full">
-                  <Link href={`/team/${member.id}`}>View details</Link>
+                  <Link href={`/team/${member.id}`} prefetch={false}>
+                    View details
+                  </Link>
                 </Button>
               </CardContent>
             </Card>

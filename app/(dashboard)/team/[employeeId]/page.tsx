@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { History as HistoryIcon, ListPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveCycle } from "@/lib/data/active-cycle";
 import { requireRole } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -37,55 +38,54 @@ export default async function TeamMemberPage({
   const me = await requireRole(["manager", "admin"]);
   const supabase = await createClient();
 
-  const { data: employee } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", employeeId)
-    .single<Profile>();
+  const [{ data: employee }, cycle] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", employeeId).single<Profile>(),
+    getActiveCycle(),
+  ]);
   if (!employee) notFound();
 
   const isAuthorized = me.role === "admin" || employee.manager_id === me.id;
   if (!isAuthorized) notFound();
 
-  const { data: cycle } = await supabase
-    .from("cycles")
-    .select("*")
-    .eq("is_active", true)
-    .maybeSingle<Cycle>();
-
-  const { data: sheet } = cycle
-    ? await supabase
+  const sheetPromise = cycle
+    ? supabase
         .from("goal_sheets")
         .select("*")
         .eq("employee_id", employee.id)
         .eq("cycle_id", cycle.id)
         .maybeSingle<GoalSheet>()
-    : { data: null };
+    : Promise.resolve({ data: null as GoalSheet | null });
 
-  const { data: goals } = sheet
-    ? await supabase
+  const { data: thrustAreas } = await supabase.from("thrust_areas").select("*");
+
+  const { data: sheet } = await sheetPromise;
+
+  const goalsPromise = sheet
+    ? supabase
         .from("goals")
         .select("*")
         .eq("goal_sheet_id", sheet.id)
         .order("display_order")
-    : { data: [] as Goal[] };
+    : Promise.resolve({ data: [] as Goal[] });
 
+  const { data: goals } = await goalsPromise;
   const goalIds = (goals ?? []).map((g) => g.id);
-  const { data: achievements } = goalIds.length
-    ? await supabase.from("achievements").select("*").in("goal_id", goalIds)
-    : { data: [] as Achievement[] };
 
-  const { data: comments } = sheet
-    ? await supabase
-        .from("checkin_comments")
-        .select("*")
-        .eq("goal_sheet_id", sheet.id)
-        .order("created_at", { ascending: false })
-    : { data: [] as CheckinComment[] };
+  const [achievementsResult, commentsResult] = await Promise.all([
+    goalIds.length
+      ? supabase.from("achievements").select("*").in("goal_id", goalIds)
+      : Promise.resolve({ data: [] as Achievement[] }),
+    sheet
+      ? supabase
+          .from("checkin_comments")
+          .select("*")
+          .eq("goal_sheet_id", sheet.id)
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] as CheckinComment[] }),
+  ]);
 
-  const { data: thrustAreas } = await supabase
-    .from("thrust_areas")
-    .select("*");
+  const achievements = achievementsResult.data ?? [];
+  const comments = commentsResult.data ?? [];
 
   const assignGoalsOpen =
     !!cycle && isGoalSettingPhase(cycle.current_phase);

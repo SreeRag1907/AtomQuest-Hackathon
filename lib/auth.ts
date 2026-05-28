@@ -1,14 +1,15 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, UserRole } from "@/types/database";
 
-export async function getSession() {
+export const getSession = cache(async () => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   return user;
-}
+});
 
-export async function getProfile(): Promise<Profile | null> {
+export const getProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -19,9 +20,9 @@ export async function getProfile(): Promise<Profile | null> {
     .eq("id", user.id)
     .maybeSingle();
   return (data as Profile | null) ?? null;
-}
+});
 
-export async function requireProfile(): Promise<Profile> {
+export const requireProfile = cache(async (): Promise<Profile> => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   // No session at all → middleware will already have redirected, but keep a
@@ -38,7 +39,7 @@ export async function requireProfile(): Promise<Profile> {
   if (!profile) redirect("/auth/error?code=no_profile");
   if (!profile.is_active) redirect("/auth/error?code=deactivated");
   return profile;
-}
+});
 
 export async function requireRole(roles: UserRole[]): Promise<Profile> {
   const profile = await requireProfile();

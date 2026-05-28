@@ -101,7 +101,7 @@ export async function EmployeeDashboard({ profile }: { profile: Profile }) {
                   </div>
                 )}
                 <Button asChild className="w-full">
-                  <Link href={`/goals/${sheet.id}`}>
+                  <Link href={`/goals/${sheet.id}`} prefetch={false}>
                     {sheet.status === "draft" || sheet.status === "returned"
                       ? "Continue editing"
                       : "View goal sheet"}
